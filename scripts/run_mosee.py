@@ -161,4 +161,4 @@ if __name__ == "__main__":
     main(tickers_csv, start_date, end_date, API_KEY, save_shortlist, take_top_X, minimum_MOS, test_and_debug)
 
 
-# github PAT: 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
+
