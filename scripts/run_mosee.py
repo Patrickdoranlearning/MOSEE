@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 from datetime import datetime
 from financetoolkit import Toolkit
@@ -8,7 +10,7 @@ from MOSEE.data_retrieval.market_data import get_stock_data, convert_currency
 from MOSEE.fundamental_analysis.indicators import get_earnings_equity
 from MOSEE.fundamental_analysis.valuation import dcf_valuation, pad_valuation, calculate_average_price
 
-def create_MOSEE_df(ticker_df, start_date, end_date, API_KEY):
+def create_MOSEE_df(ticker_df, forex_data_df,  start_date, end_date, API_KEY):
     """
     DEV ---
     This function will look through many tickers to try find companies with a high margin of safety and high earnings
@@ -23,6 +25,7 @@ def create_MOSEE_df(ticker_df, start_date, end_date, API_KEY):
 
     Returns:
     - DataFrame: DataFrame containing the shortlist of stocks to invest in
+    - forex_df: return new forex dataframe
     """
 
     shortlist_df = pd.DataFrame()
@@ -51,7 +54,7 @@ def create_MOSEE_df(ticker_df, start_date, end_date, API_KEY):
             balance_sheet = finanal_prep.get_balance_sheet_statement()
             currency = finanal_prep.get_statistics_statement()
             reported_currency = currency.loc['Reported Currency', '2022']
-
+            print('finished all downloads and reported currency ')
             # check to see if api has collected data
             if cash_flow is None or cash_flow.empty:
                 print(f"No data found for {ticker}. Skipping...")
@@ -60,9 +63,9 @@ def create_MOSEE_df(ticker_df, start_date, end_date, API_KEY):
             # checking to see if my two data sources are using the same currency, if not they are converted
             if reported_currency != stock_currency:
                 print('exchanging')
-                cash_flow = convert_currency(cash_flow, reported_currency, stock_currency)
+                cash_flow, forex_data_df = convert_currency(cash_flow, reported_currency, stock_currency, forex_data_df)
                 # will be used later for asset light
-                balance_sheet = convert_currency(balance_sheet, reported_currency, stock_currency)
+                #balance_sheet = convert_currency(balance_sheet, reported_currency, stock_currency)
 
             net_income_dic = net_income_expected(cash_flow, 10)
 
@@ -72,7 +75,7 @@ def create_MOSEE_df(ticker_df, start_date, end_date, API_KEY):
             market_average_value = calculate_average_price(stock_data)
 
             # Outputs
-            earnings_equity = get_earnings_equity(net_income_dic['net_income_average'], stock_cap)
+            earnings_equity = get_earnings_equity(net_income_dic, stock_cap)
 
             # Calculating the margin of safety price of 1 dollar trying to by 1 dollar for less than 50 cents
             market_mos = mos_dollar(current_price, market_average_value)
@@ -81,10 +84,12 @@ def create_MOSEE_df(ticker_df, start_date, end_date, API_KEY):
 
             # Equity/Earning * MOS -- Bigger is better
             if (market_mos < 0 or pad_mos < 0 or dcf_mos < 0) and earnings_equity < 0:
+                print('One or more of the MOS values are negative as well as the earnings equity')
                 market_MOSEE = 0
                 pad_MOSEE = 0
                 dcf_MOSEE = 0
             else:
+                print('calculating MOSEE values')
                 market_MOSEE = earnings_equity * (1 / market_mos)  # needs 1/mos as it is better if big
                 pad_MOSEE = earnings_equity * (1 / pad_mos)
                 dcf_MOSEE = earnings_equity * (1 / dcf_mos)
@@ -119,21 +124,30 @@ def create_MOSEE_df(ticker_df, start_date, end_date, API_KEY):
     # Sorting the shortlist based on margin of safety in descending order
     shortlist_df = shortlist_df.sort_values(by='PAD MOSEE', ascending=False)
 
-    return shortlist_df
+    return shortlist_df, forex_data_df
 
 
-def main(tickers_csv, start_date, end_date, API_KEY, save_shortlist, take_top_X, minimum_MOS, test_and_debug):
+def main(tickers_csv, forex_csv, start_date, end_date, API_KEY, save_shortlist, take_top_X, minimum_MOS, test_and_debug,
+         batch_run, batch_start, batch_end):
+
+    print(f'Reading the tickers from {tickers_csv}')
     tickers = pd.read_csv(tickers_csv)
+    forex_df = pd.read_csv(forex_csv)
+    todays_date = datetime.today().strftime('%Y-%m-%d')
 
     if test_and_debug:
         print('WARNING: On Test and Debug mode - Only looking at 3 tickers')
-        tickers = tickers[:3]
+        tickers = tickers[9:10]
+
+    if batch_run:
+        print(f'BATCH: tickers {batch_start} to {batch_end}')
+        tickers = tickers[batch_start:batch_end]
    
     if end_date == None:
-        end_date = datetime.today().strftime('%Y-%m-%d')
+        end_date = todays_date
         print(f'Using todays date as the end date: {end_date}')
         
-    shortlist = create_MOSEE_df(tickers, start_date, end_date, API_KEY)
+    shortlist, forex_df = create_MOSEE_df(tickers, forex_df,  start_date, end_date, API_KEY)
 
     if save_shortlist != None:
         if minimum_MOS != None:
@@ -144,21 +158,41 @@ def main(tickers_csv, start_date, end_date, API_KEY, save_shortlist, take_top_X,
             print(f'Only saving the top {take_top_X} companies')
             shortlist = shortlist.head(take_top_X)
 
-        print(f'Saving short list to {save_shortlist}')
-        shortlist.to_csv(save_shortlist)
+        folder_path = f"../outputs/{todays_date}/"
+        if test_and_debug:
+            file_name = "shortlist_debug_mode"
+        elif batch_run:
+            file_name = f"shortlist_batch_{batch_start}_{batch_end}"
+        else:
+            file_name = "shortlist"
+        if not os.path.exists(folder_path):
+            # If not, create the folder
+            os.makedirs(folder_path)
+            print(f"Folder '{folder_path}' created.")
+
+        print(f'Saving short list to {folder_path}/{file_name}.csv')
+        shortlist.to_csv(f'{folder_path}/{file_name}.csv')
+        forex_df.to_csv(f'{folder_path}/forex_data_update.csv')
 
 
 if __name__ == "__main__":
-    tickers_csv = '/Users/patrickdoran/Documents/Python/Investment_Decisions/ticker_grouped.csv'
-    start_date = '2016-01-01'
-    end_date = '2024-01-01'  # if using today's date leave as None
+    tickers_csv = '/Users/patrickdoran/Documents/Python/Investment_Decisions/ticker_data_enhanced.csv'
+    forex_csv = '/Users/patrickdoran/Documents/Python/Investment_Decisions/forex_data.csv'
+    start_date = '2014-01-01'
+    end_date = '2024-04-16'  # if using today's date leave as None
     API_KEY = "n2t40UpDfJuZHZA4UvbY95Wf294lqFs4"
-    save_shortlist = '../outputs/shortlist.csv'
-    take_top_X = 100
-    minimum_MOS = 0.7
-    test_and_debug = True
+    CURRENCY_API = "fca_live_yILyu6NthjaHqQuxOZkf7W2sQCQdv39hVatcTTh5"
+    save_shortlist = '../outputs/shortlist_2024.csv'
+    save_forex = '../outputs/forex_data_update.csv'
+    take_top_X = 500
+    minimum_MOS = None
+    test_and_debug = False
+    batch_run = False
+    batch_start = 0
+    batch_end = 500
     print('Variables set up, running main next')
-    main(tickers_csv, start_date, end_date, API_KEY, save_shortlist, take_top_X, minimum_MOS, test_and_debug)
+    main(tickers_csv, forex_csv, start_date, end_date, API_KEY, save_shortlist, take_top_X, minimum_MOS, test_and_debug,
+         batch_run, batch_start, batch_end)
 
 
 

@@ -159,3 +159,6 @@ if __name__ == "__main__":
     test_and_debug = True
     print('Variables set up, running main next')
     main(tickers_csv, start_date, end_date, API_KEY, save_shortlist, take_top_X, minimum_MOS, test_and_debug)
+
+
+

@@ -27,6 +27,7 @@ def get_earnings_equity(net_income_dictionary, market_cap):
     Returns:
     - earnings_equity float: ratio of earnings to equity. The higher the better
     """
+
     earnings_equity = net_income_dictionary['net_income_average'] / market_cap
 
     return earnings_equity
