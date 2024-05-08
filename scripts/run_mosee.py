@@ -1,4 +1,5 @@
 import os
+import yfinance as yf
 
 import pandas as pd
 from datetime import datetime
@@ -12,7 +13,8 @@ from MOSEE.fundamental_analysis.valuation import dcf_valuation, pad_valuation, c
 
 def create_MOSEE_df(ticker_df, forex_data_df,  start_date, end_date, API_KEY):
     """
-    DEV ---
+    TODO
+    - Look at dividend valuation for banks only or other industries
     This function will look through many tickers to try find companies with a high margin of safety and high earnings
     to equity, i will also include assetlightness and if two stocks have the same or similar metrics this will help decide
     which is a better option for investment
@@ -33,8 +35,21 @@ def create_MOSEE_df(ticker_df, forex_data_df,  start_date, end_date, API_KEY):
     for ticker in ticker_df['ticker']:
         print(ticker)
         try:
+            info = yf.Ticker(ticker).info
+            EPS = info['trailingEps']
+            ticker_object = yf.Ticker("AAPL")
+            hist = ticker_object.history(period="1Y")
+            EPS_screen = EPS/hist['Close'][-1]
+            if EPS_screen < 0.75:
+                pass
+            else:
+                continue
+        except Exception as e:
+            print(f"Error processing {ticker} info: {e}")
+
+        try:
             # Fetching historical stock data
-            stock_data, stock_cap, stock_currency = get_stock_data(ticker, start_date, end_date)
+            stock_data, stock_cap, stock_currency, EPS = get_stock_data(ticker, start_date, end_date)
             # Check if stock data is retrieved successfully
             if stock_data is None or stock_data.empty:
                 print(f"No data found for {ticker}. Skipping...")
@@ -49,10 +64,10 @@ def create_MOSEE_df(ticker_df, forex_data_df,  start_date, end_date, API_KEY):
                 continue
 
             # Get Fundamental Data
-            finanal_prep = Toolkit([ticker], api_key=API_KEY, start_date=start_date, convert_currency=False)
-            cash_flow = finanal_prep.get_cash_flow_statement()
-            balance_sheet = finanal_prep.get_balance_sheet_statement()
-            currency = finanal_prep.get_statistics_statement()
+            financial_prep = Toolkit([ticker], api_key=API_KEY, start_date=start_date, end_date = end_date,  convert_currency=False)
+            cash_flow = financial_prep.get_cash_flow_statement()
+            balance_sheet = financial_prep.get_balance_sheet_statement()
+            currency = financial_prep.get_statistics_statement()
             reported_currency = currency.loc['Reported Currency', '2022']
             print('finished all downloads and reported currency ')
             # check to see if api has collected data
@@ -64,15 +79,18 @@ def create_MOSEE_df(ticker_df, forex_data_df,  start_date, end_date, API_KEY):
             if reported_currency != stock_currency:
                 print('exchanging')
                 cash_flow, forex_data_df = convert_currency(cash_flow, reported_currency, stock_currency, forex_data_df)
-                # will be used later for asset light
-                #balance_sheet = convert_currency(balance_sheet, reported_currency, stock_currency)
+                balance_sheet = convert_currency(balance_sheet, reported_currency, stock_currency)
 
             net_income_dic = net_income_expected(cash_flow, 10)
+            balance_sheet_dic = balance_sheet_data_dic(balance_sheet)
+            dividends_dic = dividends_expected_dic(cash_flow)
 
             # Value Metrics
             dcf_value = dcf_valuation(net_income_dic)
-            pad_value = pad_valuation(net_income_dic)
+            pad_value = pad_valuation(net_income_dic) ## Add in if statement here, take our dividend valuation
             market_average_value = calculate_average_price(stock_data)
+            pad_dividend_valuation = pad_valuation_dividend(dividends_dic)
+            book_valuation = book_value(balance_sheet_dic)
 
             # Outputs
             earnings_equity = get_earnings_equity(net_income_dic, stock_cap)
@@ -81,6 +99,9 @@ def create_MOSEE_df(ticker_df, forex_data_df,  start_date, end_date, API_KEY):
             market_mos = mos_dollar(current_price, market_average_value)
             pad_mos = mos_dollar(stock_cap, pad_value)
             dcf_mos = mos_dollar(stock_cap, dcf_value)
+            pad_dividend_mos = mos_dollar(stock_cap, pad_dividend_valuation)
+            book_mos = mos_dollar(stock_cap, book_valuation)
+
 
             # Equity/Earning * MOS -- Bigger is better
             if (market_mos < 0 or pad_mos < 0 or dcf_mos < 0) and earnings_equity < 0:
@@ -88,27 +109,39 @@ def create_MOSEE_df(ticker_df, forex_data_df,  start_date, end_date, API_KEY):
                 market_MOSEE = 0
                 pad_MOSEE = 0
                 dcf_MOSEE = 0
+                pad_dividend_MOSEE = 0
+                book_MOSEE = 0
+
             else:
                 print('calculating MOSEE values')
                 market_MOSEE = earnings_equity * (1 / market_mos)  # needs 1/mos as it is better if big
                 pad_MOSEE = earnings_equity * (1 / pad_mos)
                 dcf_MOSEE = earnings_equity * (1 / dcf_mos)
+                pad_dividend_MOSEE = earnings_equity * (1 / pad_dividend_mos)
+                book_MOSEE = earnings_equity * (1 / book_mos)
+
 
             # Add company information to the shortlist DataFrame
             new_data = {
                 'Ticker Symbol': ticker,  # More descriptive column name
                 'Market MoS': market_mos,
                 'PAD MoS': pad_mos,
+                'Pad Dividend MoS': pad_dividend_mos,
                 'DCF MoS': dcf_mos,
+                'Book MoS': book_mos,
                 'Average Market Price': market_average_value,
                 'Current Price': current_price,
                 'PAD Value': pad_value,
+                'PAD Dividend Value': pad_dividend_valuation,
                 'DCF Value': dcf_value,
+                'Book Value': book_valuation,
                 'Market Cap': stock_cap,
                 'Earnings per Dollar Equity': earnings_equity,
                 'Market MOSEE': market_MOSEE,
                 'PAD MOSEE': pad_MOSEE,
+                'Pad Dividend MOSEE': pad_dividend_MOSEE,
                 'DCF MOSEE': dcf_MOSEE,
+                'Book MOSEE': book_MOSEE,
             }
             new_df = pd.DataFrame(new_data, index=[ticker])
 
@@ -137,7 +170,7 @@ def main(tickers_csv, forex_csv, start_date, end_date, API_KEY, save_shortlist, 
 
     if test_and_debug:
         print('WARNING: On Test and Debug mode - Only looking at 3 tickers')
-        tickers = tickers[9:10]
+        tickers = tickers[0:10]
 
     if batch_run:
         print(f'BATCH: tickers {batch_start} to {batch_start + batch_size - 1}')
@@ -193,10 +226,10 @@ if __name__ == "__main__":
     save_forex = '../outputs/forex_data_update.csv'
     take_top_X = 500
     minimum_MOS = None
-    test_and_debug = False
+    test_and_debug = True
     batch_run = True
     batch_size = 100
-    batch_start = 1700
+    batch_start = 00
     print('Variables set up, running main next')
 
     while True:

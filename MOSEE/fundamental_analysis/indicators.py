@@ -32,3 +32,23 @@ def get_earnings_equity(net_income_dictionary, market_cap):
 
     return earnings_equity
 
+def get_ROIC(owners_earnings, invested_capital):
+    """
+    this is the return on invested capital by the company, look for companies who have a history of high ROIC.
+    ROIC above 10% is good. One can consider lower ROIC in the case that the company has a wide moat.
+
+    Args:
+    - owners_earnings float: operating profit + deprecation + amortisation of goodwill
+                            - federal income tax (average) - cost of stock options
+                            - maintenance costs(essential capital expenditures)
+                            - any income from unsustainable sources
+    - invested_capital float: total_assets - cash - short term investments + past accounting charges
+
+    Returns:
+    - ROIC float: higher is better
+    """
+
+    ROIC = owners_earnings/invested_capital
+
+    return ROIC
+

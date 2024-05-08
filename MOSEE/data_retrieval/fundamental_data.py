@@ -31,7 +31,7 @@ def fundamental_downloads(ticker_temp, API_KEY, start_date='2015-05-01'):
     return fundamentals
 
 
-def balance_sheet_data(balance_sheet_statements_fmp):
+def balance_sheet_data_dic(balance_sheet_statements_fmp):
     """
     This function will extract certain assets and liabilities of interest from the balance sheet statement
 
@@ -47,7 +47,7 @@ def balance_sheet_data(balance_sheet_statements_fmp):
     current_assets = balance_sheet_statements_fmp.loc['Total Current Assets']
     current_liabilities = balance_sheet_statements_fmp.loc['Total Current Liabilities']
     intangible_assets = balance_sheet_statements_fmp.loc['Intangible Assets']
-    total_assets = balance_sheet_statements_fmp.loc['Intangible Assets']
+    total_assets = balance_sheet_statements_fmp.loc['Total Assets']
     total_liabilities = balance_sheet_statements_fmp.loc['Total Liabilities']
     tangible_assets = total_assets - intangible_assets
     net_assets = total_assets - total_liabilities
@@ -111,3 +111,160 @@ def net_income_expected(cash_flow_statement_fmp, years_projection=10, decay_rate
     net_income['net_income_average_growth'] = net_income_average_growth
 
     return net_income
+
+
+def dividends_expected_dic(cash_flow_statement_fmp, years_projection = 10):
+    """
+    This function will calculate the money returned to investors either by dividends or stock buy backs
+
+    Args:
+    - cash_flow_statements: takes in the cashflow statement from the financial model prep
+    - years_projection: how many years into the future are you looking to project
+
+    Returns:
+    - dividends_dic dictonary
+    """
+    import pandas as pd
+    from sklearn.linear_model import LinearRegression
+
+    # Cashflow fundamentals
+    dividends_dic = {}
+    dividends_df = - cash_flow_statement_fmp.loc['Dividends Paid']
+
+
+    dividend_average = dividends_df.values.mean()
+
+    # Assuming dividends_df contains your DataFrame with dividend data
+    numerical_years = list(range(len(dividends_df)))
+
+    # Prepare your data
+    X = pd.DataFrame(numerical_years)
+    y = dividends_df.values  # Dependent variable (dividends)
+
+    # Fit a linear regression model
+    model = LinearRegression()
+    model.fit(X, y)
+
+    # Make predictions for future time points
+    future_time_points = [[max(numerical_years) + i + 1] for i in range(years_projection)]
+    expected_dividend = model.predict(future_time_points)
+    dividend_average_growth = model.coef_[0] / (dividend_average * years_projection)
+
+    dividends_dic['dividends_df'] = dividends_df
+    dividends_dic['dividend_average_growth'] = dividend_average_growth
+    dividends_dic['expected_dividend'] = expected_dividend
+    dividends_dic['dividends_average'] = dividend_average
+
+
+    return dividends_dic
+
+
+def stock_buybacks_expected(cash_flow_statement_fmp, years_projection = 10, decay_rate=1.5):
+    """
+    TODO
+    This function will calculate the value of stock buybacks using weighted linear regression.
+
+    Args:
+    - cash_flow_statement_fmp: cash flow statement from the financial model preparation
+    - years_projection: how many years into the future you want to project
+    - decay_rate: rate of exponential decay for assigning weights (default is 0.9)
+
+    Returns:
+    - stock_buybacks_dic: dictionary containing information about stock buybacks
+    """
+    # Cashflow fundamentals
+    stock_buybacks_dic = {}
+    stock_buybacks_df = (-cash_flow_statement_fmp.loc['Common Stock Purchased']
+                         - cash_flow_statement_fmp.loc['Common Stock Issued'])
+
+    buyback_average = stock_buybacks_df.values.mean()
+
+    # Assuming stock_buybacks_df contains your DataFrame with stock buybacks data
+    numerical_years = list(range(len(stock_buybacks_df)))
+
+    # Prepare your data
+    X = pd.DataFrame(numerical_years)
+    y = stock_buybacks_df.values  # Dependent variable (stock buybacks)
+
+    # Fit a weighted linear regression model
+    weights = [decay_rate ** i for i in range(len(y))]
+    model = LinearRegression()
+    model.fit(X, y, sample_weight=weights)
+    buyback_average_growth = model.coef_[0] / (buyback_average * years_projection)
+
+    # Make predictions for future time points
+    future_time_points = [[max(numerical_years) + i + 1] for i in range(years_projection)]
+    expected_buyback = model.predict(future_time_points)
+
+    stock_buybacks_dic['stock_buybacks_df'] = stock_buybacks_df
+    stock_buybacks_dic['buyback_average_growth'] = buyback_average_growth
+    stock_buybacks_dic['expected_buyback'] = expected_buyback
+    stock_buybacks_dic['buyback_average'] = buyback_average
+    stock_buybacks_dic['stock_issued'] = buyback_average # how many shares were sold as options to insiders?
+    stock_buybacks_dic['treasury_stocks_added'] = treasury_stock  # now many shares were taken out of circulation?
+
+    return stock_buybacks_dic
+
+
+def earnings_return_to_shareholders(cash_flow_statement_fmp, years_projection = 10):
+    """
+    This function will calculate the earnings returned to investors either by dividends or stock buy backs
+
+    Args:
+    - cash_flow_statements: takes in the cashflow statement from the financial model prep
+
+    Returns:
+    - dividends: the dividends paid to shareholders
+    - dividends_growth: growth in the dividends being paid
+    - stock_buybacks: the value of stock buybacks
+    - total_value_returned: dividends & stock_buybacks
+    - net_income: Net income
+    - retained_earnings: Net_income - total_value_returned
+    """
+    total_earnings_returned = {}
+    dividends_dic = dividends_expected(cash_flow_statement_fmp, years_projection)
+    buybacks_dic = stock_buybacks_expected(cash_flow_statement_fmp, years_projection)
+
+    total_earnings_returned['past_value'] = dividends_dic['dividends_df'] + dividends_dic['stock_buybacks_df']
+    total_earnings_returned['future_value'] = buybacks_dic['expected_dividend'] + buybacks_dic['expected_buyback']
+
+    return total_earnings_returned
+
+def get_owners_earnings(balance_sheet_statements_fmp, cash_flow_statement_fmp):
+    """
+    TODO
+    owners_earnings float: operating profit + deprecation + amortisation of goodwill
+                            - federal income tax (average) - cost of stock options
+                            - maintenance costs(essential capital expenditures)
+                            - any income from unsustainable sources
+
+    Args:
+    - cash_flow_statements: takes in the cashflow statement from the financial model prep
+
+    Returns:
+    - owners_earnings float:
+    """
+
+
+
+    return owners_earnings
+
+
+def get_invested_capital(balance_sheet_statements_fmp):
+    """
+    TODO
+    owners_earnings float: operating profit + deprecation + amortisation of goodwill
+                            - federal income tax (average) - cost of stock options
+                            - maintenance costs(essential capital expenditures)
+                            - any income from unsustainable sources
+
+    Args:
+    - cash_flow_statements: takes in the cashflow statement from the financial model prep
+
+    Returns:
+    - owners_earnings float:
+    """
+
+    return invested_capital
+
+
