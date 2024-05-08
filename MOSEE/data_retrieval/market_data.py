@@ -64,14 +64,18 @@ def convert_currency(amount, currency_from, currency_to, fx_df):
     Returns:
     - float: The converted amount in the target currency.
     """
+    currency_from = currency_from.upper()
+    currency_to = currency_to.upper()
+
     try:
         # Try accessing the exchange rate from the DataFrame
         exchange_rate = fx_df[(fx_df['Currency_From'] == currency_from) &
                               (fx_df['Currency_To'] == currency_to)]['Exchange_Rate'].values[0]
-        last_download_date_str = fx_df[(fx_df['Currency_From'] == currency_from) &
+        last_download_date = fx_df[(fx_df['Currency_From'] == currency_from) &
                                    (fx_df['Currency_To'] == currency_to)]['date'].values[0]
-        last_download_date = datetime.strptime(last_download_date_str, '%d/%m/%Y').date()
-        print(last_download_date)
+        if type(last_download_date) == str:
+            last_download_date = datetime.strptime(last_download_date, '%d/%m/%Y').date()
+            print(last_download_date)
         if date.today() - last_download_date > timedelta(weeks=4) or pd.isna(last_download_date):
             try:
                 # Try accessing the second API as a backup

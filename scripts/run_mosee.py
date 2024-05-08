@@ -128,7 +128,7 @@ def create_MOSEE_df(ticker_df, forex_data_df,  start_date, end_date, API_KEY):
 
 
 def main(tickers_csv, forex_csv, start_date, end_date, API_KEY, save_shortlist, take_top_X, minimum_MOS, test_and_debug,
-         batch_run, batch_start, batch_end):
+         batch_run, batch_size, batch_start):
 
     print(f'Reading the tickers from {tickers_csv}')
     tickers = pd.read_csv(tickers_csv)
@@ -140,21 +140,25 @@ def main(tickers_csv, forex_csv, start_date, end_date, API_KEY, save_shortlist, 
         tickers = tickers[9:10]
 
     if batch_run:
-        print(f'BATCH: tickers {batch_start} to {batch_end}')
-        tickers = tickers[batch_start:batch_end]
-   
-    if end_date == None:
-        end_date = todays_date
-        print(f'Using todays date as the end date: {end_date}')
-        
-    shortlist, forex_df = create_MOSEE_df(tickers, forex_df,  start_date, end_date, API_KEY)
+        print(f'BATCH: tickers {batch_start} to {batch_start + batch_size - 1}')
+        tickers_batch = tickers[batch_start:batch_start + batch_size]
+        remaining_tickers = tickers[batch_start + batch_size:]
+    else:
+        tickers_batch = tickers
+        remaining_tickers = pd.DataFrame()
 
-    if save_shortlist != None:
-        if minimum_MOS != None:
+    if end_date is None:
+        end_date = todays_date
+        print(f'Using today\'s date as the end date: {end_date}')
+
+    shortlist, forex_df = create_MOSEE_df(tickers_batch, forex_df, start_date, end_date, API_KEY)
+
+    if save_shortlist is not None:
+        if minimum_MOS is not None:
             print(f'Filtering the MoS to be less than {minimum_MOS} before saving')
             cols = ['Market MoS', 'PAD MoS', 'DCF MoS']
             shortlist[cols] = shortlist[shortlist[cols] <= minimum_MOS][cols]
-        if take_top_X != None:
+        if take_top_X is not None:
             print(f'Only saving the top {take_top_X} companies')
             shortlist = shortlist.head(take_top_X)
 
@@ -162,7 +166,7 @@ def main(tickers_csv, forex_csv, start_date, end_date, API_KEY, save_shortlist, 
         if test_and_debug:
             file_name = "shortlist_debug_mode"
         elif batch_run:
-            file_name = f"shortlist_batch_{batch_start}_{batch_end}"
+            file_name = f"shortlist_batch_{batch_start}_{batch_start + batch_size - 1}"
         else:
             file_name = "shortlist"
         if not os.path.exists(folder_path):
@@ -172,12 +176,15 @@ def main(tickers_csv, forex_csv, start_date, end_date, API_KEY, save_shortlist, 
 
         print(f'Saving short list to {folder_path}/{file_name}.csv')
         shortlist.to_csv(f'{folder_path}/{file_name}.csv')
-        forex_df.to_csv(f'{folder_path}/forex_data_update.csv')
+        forex_df.to_csv(f'../outputs/forex_data_update.csv')
+
+    return remaining_tickers
+
 
 
 if __name__ == "__main__":
     tickers_csv = '/Users/patrickdoran/Documents/Python/Investment_Decisions/ticker_data_enhanced.csv'
-    forex_csv = '/Users/patrickdoran/Documents/Python/Investment_Decisions/forex_data.csv'
+    forex_csv = '/Users/patrickdoran/repos/MOSEE/outputs/forex_data_update.csv'
     start_date = '2014-01-01'
     end_date = '2024-04-16'  # if using today's date leave as None
     API_KEY = "n2t40UpDfJuZHZA4UvbY95Wf294lqFs4"
@@ -187,12 +194,15 @@ if __name__ == "__main__":
     take_top_X = 500
     minimum_MOS = None
     test_and_debug = False
-    batch_run = False
-    batch_start = 0
-    batch_end = 500
+    batch_run = True
+    batch_size = 100
+    batch_start = 1700
     print('Variables set up, running main next')
-    main(tickers_csv, forex_csv, start_date, end_date, API_KEY, save_shortlist, take_top_X, minimum_MOS, test_and_debug,
-         batch_run, batch_start, batch_end)
 
-
-
+    while True:
+        remaining_tickers = main(tickers_csv, forex_csv, start_date, end_date, API_KEY, save_shortlist, take_top_X,
+                                 minimum_MOS, test_and_debug, batch_run, batch_size, batch_start)
+        if len(remaining_tickers) == 0:
+            break
+        else:
+            batch_start += batch_size

@@ -1,5 +1,17 @@
+Mosee: 
+- Is a simple stock screener which is looking for value stocks
+- It calculates intrinsic values using net income projections
+- It also takes into account the earnings to equity of a company
+- The higher the earnings to equity, the more money returned per euro invested
+- 
+
 Future works:
-- asset light factor
+- Asset light factor
+- Look at different valuation models for different sectors (banks discounted dividend models)
+- look into the money spent in stock buy backs? Is this a good use of investor capital?
+- What percent of the company will I own at this level of buy backs in 5 years?
+- Do buy backs represent a large percentage of volume? or market capitalisation?
+- Is the buyback creating value or destroying value?
 - use volatility to determine the speed of returns
 - minimise the amount you pay per dollar, maximise volatility
 
