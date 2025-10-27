@@ -2,8 +2,10 @@ import yfinance as yf
 from forex_python.converter import CurrencyRates
 import freecurrencyapi
 from datetime import date, timedelta, datetime
-CURRENCY_API = "fca_live_yILyu6NthjaHqQuxOZkf7W2sQCQdv39hVatcTTh5"
+import pandas as pd
 
+CURRENCY_API = "fca_live_yILyu6NthjaHqQuxOZkf7W2sQCQdv39hVatcTTh5"
+currency_api_key = 'fca_live_yILyu6NthjaHqQuxOZkf7W2sQCQdv39hVatcTTh5'
 
 
 def get_stock_data(ticker, start_date, end_date):
@@ -41,15 +43,7 @@ def get_ticker_info(ticker):
     return ticker_info
 
 
-import pandas as pd
-from datetime import date, timedelta
-from forex_python.converter import CurrencyRates
-import freecurrencyapi
-
-currency_api_key = 'fca_live_yILyu6NthjaHqQuxOZkf7W2sQCQdv39hVatcTTh5'
-
-
-def convert_currency(amount, currency_from, currency_to, fx_df):
+def convert_currency(amount, currency_from, currency_to, fx_df, currency_api_key):
     """
     Production---
     Convert a specified amount from one currency to another.
@@ -60,6 +54,7 @@ def convert_currency(amount, currency_from, currency_to, fx_df):
     - currency_from (str): The currency code to convert from.
     - currency_to (str): The currency code to convert to.
     - fx_df (DataFrame): DataFrame containing exchange rates.
+    - currency_api_key (str): API key for the currency converter.
 
     Returns:
     - float: The converted amount in the target currency.
@@ -67,25 +62,25 @@ def convert_currency(amount, currency_from, currency_to, fx_df):
     currency_from = currency_from.upper()
     currency_to = currency_to.upper()
 
-    try:
-        # Try accessing the exchange rate from the DataFrame
-        exchange_rate = fx_df[(fx_df['Currency_From'] == currency_from) &
-                              (fx_df['Currency_To'] == currency_to)]['Exchange_Rate'].values[0]
-        last_download_date = fx_df[(fx_df['Currency_From'] == currency_from) &
-                                   (fx_df['Currency_To'] == currency_to)]['date'].values[0]
-        if type(last_download_date) == str:
+    # Check if the exchange rate is in the DataFrame
+    exchange_rate_row = fx_df[(fx_df['Currency_From'] == currency_from) &
+                              (fx_df['Currency_To'] == currency_to)]
+
+    if not exchange_rate_row.empty:
+        exchange_rate = exchange_rate_row['Exchange_Rate'].values[0]
+        last_download_date = exchange_rate_row['date'].values[0]
+
+        if isinstance(last_download_date, str):
             last_download_date = datetime.strptime(last_download_date, '%d/%m/%Y').date()
-            print(last_download_date)
+
         if date.today() - last_download_date > timedelta(weeks=4) or pd.isna(last_download_date):
-            try:
-                # Try accessing the second API as a backup
-                client = freecurrencyapi.Client(currency_api_key)
-                result = client.latest([currency_from])
+            client = freecurrencyapi.Client(currency_api_key)
+            result = client.latest([currency_from])
+
+            if currency_to in result['data']:
                 exchange_rate = result['data'][currency_to]
                 today = date.today()
-                print(today)
 
-                # Create a new DataFrame with the new row data
                 new_row_df = pd.DataFrame({
                     'Currency_From': [currency_from, currency_to],
                     'Currency_To': [currency_to, currency_from],
@@ -93,85 +88,53 @@ def convert_currency(amount, currency_from, currency_to, fx_df):
                     'date': [today, today]
                 })
 
-                print(new_row_df)
+                fx_df = pd.concat([fx_df, new_row_df], ignore_index=True)
+            else:
+                c = CurrencyRates()
+                exchange_rate = c.get_rate(currency_from, currency_to)
+                today = date.today()
 
-                # Concatenate the new row DataFrame with the existing fx_df
+                new_row_df = pd.DataFrame({
+                    'Currency_From': [currency_from, currency_to],
+                    'Currency_To': [currency_to, currency_from],
+                    'Exchange_Rate': [exchange_rate, 1 / exchange_rate],
+                    'date': [today, today]
+                })
+
                 fx_df = pd.concat([fx_df, new_row_df], ignore_index=True)
 
-            except Exception as e:
-                print(f"Error accessing free currency API: {e}")
-                try:
-                    c = CurrencyRates()
-                    exchange_rate = c.get_rate(currency_from, currency_to)
-                    today = date.today()
-                    # Create a new DataFrame with the new row data
-                    new_row_df = pd.DataFrame({
-                        'Currency_From': [currency_from, currency_to],
-                        'Currency_To': [currency_to, currency_from],
-                        'Exchange_Rate': [exchange_rate, 1 / exchange_rate],
-                        'date': [today, today]
-                    })
+    else:
+        client = freecurrencyapi.Client(currency_api_key)
+        result = client.latest([currency_from])
 
-                    # Concatenate the new row DataFrame with the existing fx_df
-                    fx_df = pd.concat([fx_df, new_row_df], ignore_index=True)
-                except Exception as e:
-                    print(f"Error accessing forex API: {e}")
-                    raise ValueError(f"Error accessing second API: {e}")
-
-    except IndexError:
-        # If the exchange rate is not available in the DataFrame, update it
-        try:
-            # Try accessing the second API as a backup
-            client = freecurrencyapi.Client(currency_api_key)
-            result = client.latest([currency_from])
+        if currency_to in result['data']:
             exchange_rate = result['data'][currency_to]
             today = date.today()
-            print('here')
-            # Create a new DataFrame with the new row data
+
             for currency_to_temp, exchange_rate_temp in result['data'].items():
                 filtered_df = fx_df[
                     (fx_df['Currency_From'] == currency_from) & (fx_df['Currency_To'] == currency_to_temp)]
-                if not filtered_df.empty:
-                    exchange_rate = filtered_df['Exchange_Rate'].values[0]  # Assuming you want the first rate
-                    print(f"Exchange rate: {exchange_rate}")
-                else:
+                if filtered_df.empty:
                     new_row_df = pd.DataFrame({
                         'Currency_From': [currency_from],
                         'Currency_To': [currency_to_temp],
                         'Exchange_Rate': [exchange_rate_temp],
                         'date': [today]
                     })
-                    # Concatenate the new row DataFrame with the existing fx_df
                     fx_df = pd.concat([fx_df, new_row_df], ignore_index=True)
+        else:
+            c = CurrencyRates()
+            exchange_rate = c.get_rate(currency_from, currency_to)
+            today = date.today()
 
-        except Exception as e:
-            print(f"Error accessing free currency API: {e}")
+            new_row_df = pd.DataFrame({
+                'Currency_From': [currency_from, currency_to],
+                'Currency_To': [currency_to, currency_from],
+                'Exchange_Rate': [exchange_rate, 1 / exchange_rate],
+                'date': [today, today]
+            })
 
-            try:
-                # Try accessing the first API
-                c = CurrencyRates()
-                exchange_rate = c.get_rate(currency_from, currency_to)
-                today = date.today()
-                # Create a new DataFrame with the new row data
-                new_row_df = pd.DataFrame({
-                    'Currency_From': [currency_from, currency_to],
-                    'Currency_To': [currency_to, currency_from],
-                    'Exchange_Rate': [exchange_rate, 1 / exchange_rate],
-                    'date': [today, today]
-                })
-
-                # Concatenate the new row DataFrame with the existing fx_df
-                fx_df = pd.concat([fx_df, new_row_df], ignore_index=True)
-            except Exception as e:
-                print(f"Error accessing forex API: {e}")
-                try:
-                    # Try accessing the exchange rate from the DataFrame
-                    exchange_rate = fx_df[(fx_df['Currency_From'] == currency_from) &
-                                          (fx_df['Currency_To'] == currency_to)]['Exchange_Rate'].values[0]
-                except Exception as e:
-                    print(f"Error accessing no currency value found: {e}")
-                    raise ValueError(f"Error accessing second API: {e}")
+            fx_df = pd.concat([fx_df, new_row_df], ignore_index=True)
 
     converted_amount = amount * exchange_rate
     return converted_amount, fx_df
-

@@ -1,3 +1,6 @@
+import yfinance as yf
+
+
 def get_assets_light_factor(balance_sheet_dictionary, net_income_dictionary):
     """
     this will calculate which equities have high earnings to assets.
@@ -51,4 +54,38 @@ def get_ROIC(owners_earnings, invested_capital):
     ROIC = owners_earnings/invested_capital
 
     return ROIC
+
+def set_early_screen(ticker):
+    """
+    This will act as a preliminary screen by finding undervalued stocks
+
+    ticker: String - of the marketable security
+
+    return: Float
+    """
+    info = yf.Ticker(ticker).info
+    EPS = info.get('trailingEps')
+    if EPS is None:  # If trailingEps is not available, try using forwardPE
+        forwardPE = info.get('forwardPE')
+        if forwardPE is not None:
+            EPS = 1 / forwardPE
+
+    closing_price = info.get('previousClose')
+    annual_high = info.get('fiftyTwoWeekHigh')
+    PEG = info.get('pegRatio')
+    if PEG == None:
+        PEG = 1
+    two_hundred_average = info.get('twoHundredDayAverage')
+
+    discount_from_high = (closing_price - annual_high) / annual_high
+    discount_from_average = (closing_price - two_hundred_average)/two_hundred_average
+    earnings_equity = EPS / closing_price
+
+    if earnings_equity >= .075 or discount_from_average <= -.2 or discount_from_high <= -.4 or PEG < .5:
+        screen = 1
+    else:
+        screen = 0
+
+    return screen
+
 

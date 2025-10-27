@@ -1,4 +1,3 @@
-
 def calculate_average_price(stock_data_df):
     """
     Calculate Average Price of stock over x years
@@ -36,9 +35,10 @@ def pad_valuation(net_income_dictionary, risk_free_rate=.04, years=10):
     value = 0
     # Calculate discount factor for each time period
     for i in range(years):
-        value_temp = net_income_earning * (1 + net_income_growth - risk_free_rate) ** (i+1)
+        value_temp = net_income_earning * (1 + net_income_growth - risk_free_rate) ** (i + 1)
         value = value + value_temp
     return value
+
 
 def pad_valuation_dividend(dividends_dic, risk_free_rate=.04, years=10):
     """
@@ -59,7 +59,7 @@ def pad_valuation_dividend(dividends_dic, risk_free_rate=.04, years=10):
     value = 0
     # Calculate discount factor for each time period
     for i in range(years):
-        value_temp = dividend_average * (1 + dividend_growth - risk_free_rate) ** (i+1)
+        value_temp = dividend_average * (1 + dividend_growth - risk_free_rate) ** (i + 1)
         value = value + value_temp
     return value
 
@@ -86,6 +86,7 @@ def dcf_valuation(net_income_dictionary, risk_free_rate=.04):
         value = value + discounted_value
     return value
 
+
 def net_net_working_capital(balance_sheet_dic):
     """
     net net working capital or net current asset value is a rough gauge of the liquidation value of a company.
@@ -106,6 +107,7 @@ def net_net_working_capital(balance_sheet_dic):
 
     return net_net_working_capital
 
+
 def book_value(balance_sheet_dic):
     """
     calculated book value of a firm,
@@ -121,10 +123,10 @@ def book_value(balance_sheet_dic):
     total_liabilities = balance_sheet_dic['total_liabilities']
 
     book_value_df = total_assets - total_liabilities
-    book_value = book_value_df[-1]
+    book_value_latest = book_value_df.iloc[-1]
 
+    return book_value_latest
 
-    return book_value
 
 def tangible_book_value(balance_sheet_dic):
     """
@@ -145,6 +147,7 @@ def tangible_book_value(balance_sheet_dic):
 
     return tangible_book_value
 
+
 def value_created():
     """
     TODO
@@ -159,4 +162,3 @@ def value_created():
     over the intrinsic value of the cashflows. If so they are buying future dollars for more than $1
     """
     value_derived
-

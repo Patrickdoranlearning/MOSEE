@@ -43,7 +43,7 @@ def balance_sheet_data_dic(balance_sheet_statements_fmp):
     """
     balance_sheet = {}
     cash_df = balance_sheet_statements_fmp.loc['Cash and Cash Equivalents']
-    cash_onhand = cash_df.iloc[-1]
+    cash_on_hand = cash_df.iloc[-1]
     current_assets = balance_sheet_statements_fmp.loc['Total Current Assets']
     current_liabilities = balance_sheet_statements_fmp.loc['Total Current Liabilities']
     intangible_assets = balance_sheet_statements_fmp.loc['Intangible Assets']
@@ -53,7 +53,7 @@ def balance_sheet_data_dic(balance_sheet_statements_fmp):
     net_assets = total_assets - total_liabilities
 
     balance_sheet['cash_df'] = cash_df
-    balance_sheet['cash_onhand'] = cash_onhand
+    balance_sheet['cash_on_hand'] = cash_on_hand
     balance_sheet['current_assets'] = current_assets
     balance_sheet['current_liabilities'] = current_liabilities
     balance_sheet['intangible_assets'] = intangible_assets
@@ -76,7 +76,7 @@ def net_income_expected(cash_flow_statement_fmp, years_projection=10, decay_rate
     - decay_rate float: weights the expected earnings to more recent years
 
     Returns:
-    - net_income: disctionary containing the following keys:
+    - net_income: dictionary containing the following keys:
         - net_income_df
         - expected_net_income
         - net_income_average
@@ -113,7 +113,7 @@ def net_income_expected(cash_flow_statement_fmp, years_projection=10, decay_rate
     return net_income
 
 
-def dividends_expected_dic(cash_flow_statement_fmp, years_projection = 10):
+def dividends_expected_dic(cash_flow_statement_fmp, years_projection=10):
     """
     This function will calculate the money returned to investors either by dividends or stock buy backs
 
@@ -122,7 +122,7 @@ def dividends_expected_dic(cash_flow_statement_fmp, years_projection = 10):
     - years_projection: how many years into the future are you looking to project
 
     Returns:
-    - dividends_dic dictonary
+    - dividends_dic dictionary
     """
     import pandas as pd
     from sklearn.linear_model import LinearRegression
@@ -130,7 +130,6 @@ def dividends_expected_dic(cash_flow_statement_fmp, years_projection = 10):
     # Cashflow fundamentals
     dividends_dic = {}
     dividends_df = - cash_flow_statement_fmp.loc['Dividends Paid']
-
 
     dividend_average = dividends_df.values.mean()
 
@@ -155,11 +154,10 @@ def dividends_expected_dic(cash_flow_statement_fmp, years_projection = 10):
     dividends_dic['expected_dividend'] = expected_dividend
     dividends_dic['dividends_average'] = dividend_average
 
-
     return dividends_dic
 
 
-def stock_buybacks_expected(cash_flow_statement_fmp, years_projection = 10, decay_rate=1.5):
+def stock_buybacks_expected(cash_flow_statement_fmp, years_projection=10, decay_rate=1.5):
     """
     TODO
     This function will calculate the value of stock buybacks using weighted linear regression.
@@ -200,13 +198,14 @@ def stock_buybacks_expected(cash_flow_statement_fmp, years_projection = 10, deca
     stock_buybacks_dic['buyback_average_growth'] = buyback_average_growth
     stock_buybacks_dic['expected_buyback'] = expected_buyback
     stock_buybacks_dic['buyback_average'] = buyback_average
-    stock_buybacks_dic['stock_issued'] = buyback_average # how many shares were sold as options to insiders?
-    stock_buybacks_dic['treasury_stocks_added'] = treasury_stock  # now many shares were taken out of circulation?
+    stock_buybacks_dic['stock_issued'] = buyback_average  # how many shares were sold as options to insiders?
+    # TODO
+    # stock_buybacks_dic['treasury_stocks_added'] = treasury_stock  # now many shares were taken out of circulation?
 
     return stock_buybacks_dic
 
 
-def earnings_return_to_shareholders(cash_flow_statement_fmp, years_projection = 10):
+def earnings_return_to_shareholders(cash_flow_statement_fmp, years_projection=10):
     """
     This function will calculate the earnings returned to investors either by dividends or stock buy backs
 
@@ -230,6 +229,7 @@ def earnings_return_to_shareholders(cash_flow_statement_fmp, years_projection = 
 
     return total_earnings_returned
 
+
 def get_owners_earnings(balance_sheet_statements_fmp, cash_flow_statement_fmp):
     """
     TODO
@@ -245,9 +245,9 @@ def get_owners_earnings(balance_sheet_statements_fmp, cash_flow_statement_fmp):
     - owners_earnings float:
     """
 
+    pass
 
-
-    return owners_earnings
+    return
 
 
 def get_invested_capital(balance_sheet_statements_fmp):
@@ -268,3 +268,16 @@ def get_invested_capital(balance_sheet_statements_fmp):
     return invested_capital
 
 
+def get_debt_calls(_sheet_statements_fmp):
+    """
+    TODO
+    Calculates how much debt held by the company & how much that company will need to pay annually to service the debts
+
+    Args:
+    - Cashflow_statements: takes in the cashflow statement from the financial model prep
+
+    Returns:
+    - owners_earnings float:
+    """
+
+    return invested_capital
