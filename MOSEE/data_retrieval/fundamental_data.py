@@ -1,16 +1,103 @@
-from financetoolkit import Toolkit
+from datetime import datetime
+from typing import Optional, Union
+
 import pandas as pd
+import yfinance as yf
 from sklearn.linear_model import LinearRegression
 
 
-def fundamental_downloads(ticker_temp, API_KEY, start_date='2015-05-01'):
+BALANCE_SHEET_RENAMES = {
+    'CashAndCashEquivalents': 'Cash and Cash Equivalents',
+    'TotalCurrentAssets': 'Total Current Assets',
+    'TotalCurrentLiabilities': 'Total Current Liabilities',
+    'IntangibleAssets': 'Intangible Assets',
+    'TotalAssets': 'Total Assets',
+    'TotalLiab': 'Total Liabilities',
+    'TotalLiabilitiesNetMinorityInterest': 'Total Liabilities',
+}
+
+CASH_FLOW_RENAMES = {
+    'NetIncome': 'Net Income',
+    'DividendsPaid': 'Dividends Paid',
+    'RepurchaseOfCapitalStock': 'Common Stock Purchased',
+    'RepurchaseOfStock': 'Common Stock Purchased',
+    'CommonStockRepurchased': 'Common Stock Purchased',
+    'IssuanceOfCapitalStock': 'Common Stock Issued',
+    'IssuanceOfStock': 'Common Stock Issued',
+    'CommonStockIssued': 'Common Stock Issued',
+}
+
+INCOME_STATEMENT_RENAMES = {
+    'NetIncome': 'Net Income',
+}
+
+
+def _rename_statement_index(statement: pd.DataFrame, rename_map: dict) -> pd.DataFrame:
+    if statement is None or statement.empty:
+        return statement
+    applicable = {old: new for old, new in rename_map.items() if old in statement.index}
+    if applicable:
+        statement = statement.rename(index=applicable)
+    return statement
+
+
+def _get_statement_row(statement: pd.DataFrame, *names: str,
+                       default: Optional[Union[float, int]] = None) -> pd.Series:
+    if statement is None or statement.empty:
+        raise KeyError("Statement is empty")
+    for name in names:
+        if name in statement.index:
+            return statement.loc[name]
+    if default is not None:
+        return pd.Series(default, index=statement.columns, dtype='float64')
+    raise KeyError(f"None of the provided row names {names} were found in the statement index")
+
+
+def _normalise_statement(statement: pd.DataFrame,
+                         rename_map: dict,
+                         start_date: Optional[str]) -> pd.DataFrame:
+    """Prepare Yahoo Finance statements so they resemble the historical Toolkit layout."""
+
+    if statement is None or statement.empty:
+        return pd.DataFrame()
+
+    statement = statement.copy()
+    statement = _rename_statement_index(statement, rename_map)
+
+    # Drop duplicate columns that occasionally appear in Yahoo data
+    statement = statement.loc[:, ~statement.columns.duplicated()]
+
+    # Filter the look-back window if the caller supplied a start date
+    if start_date:
+        try:
+            cutoff = pd.Timestamp(start_date)
+            statement = statement.loc[:, statement.columns >= cutoff]
+        except Exception:
+            # If the start date cannot be parsed we keep all data to avoid surprises
+            pass
+
+    # Sort oldest->newest to match the Toolkit responses and convert to string labels
+    statement = statement.sort_index(axis=1)
+    formatted_columns = []
+    for column in statement.columns:
+        if isinstance(column, (pd.Timestamp, datetime)):
+            formatted_columns.append(column.strftime('%Y-%m-%d'))
+        else:
+            formatted_columns.append(str(column))
+    statement.columns = formatted_columns
+
+    # Yahoo returns numeric values alongside NaNs; keep the numeric view consumers expect
+    return statement.fillna(0)
+
+
+def fundamental_downloads(ticker_temp, API_KEY=None, start_date='2015-05-01'):
     """
-    This function will download from financial model prep of all the fundamental data.
+    Download the fundamental statements for a ticker using Yahoo Finance.
 
     Args:
     - ticker_temp: the ticker of the security we are investigating
     - start_date string: The start date looking back x years. Typically, 7 or 10 years in the past
-    - API_KEY: This is the api_key from financial model prep
+    - API_KEY: Kept for backwards compatibility, not used
 
     Returns:
     - fundamentals dictionary: of all fundamental dat
@@ -18,11 +105,11 @@ def fundamental_downloads(ticker_temp, API_KEY, start_date='2015-05-01'):
 
     fundamentals = {}
 
-    financial_prep = Toolkit([ticker_temp], api_key=API_KEY, start_date=start_date, convert_currency=False)
+    ticker = yf.Ticker(ticker_temp)
 
-    balance_sheet_statements = financial_prep.get_balance_sheet_statement()
-    cash_flow_statements = financial_prep.get_cash_flow_statement()
-    income_sheet_statements = financial_prep.get_income_statement()
+    balance_sheet_statements = _normalise_statement(ticker.balance_sheet, BALANCE_SHEET_RENAMES, start_date)
+    cash_flow_statements = _normalise_statement(ticker.cashflow, CASH_FLOW_RENAMES, start_date)
+    income_sheet_statements = _normalise_statement(ticker.financials, INCOME_STATEMENT_RENAMES, start_date)
 
     fundamentals['balance_sheet_statements'] = balance_sheet_statements
     fundamentals['cash_flow_statements'] = cash_flow_statements
@@ -36,19 +123,22 @@ def balance_sheet_data_dic(balance_sheet_statements_fmp):
     This function will extract certain assets and liabilities of interest from the balance sheet statement
 
     Args:
-    - balance_sheet_statements_fmp dataframe: takes in the balance statement from the financial model prep
+    - balance_sheet_statements_fmp dataframe: takes in the balance statement retrieved for the ticker
 
     Returns:
     - balance_sheet dictionary:  which contains key data from balance sheet,
     """
     balance_sheet = {}
-    cash_df = balance_sheet_statements_fmp.loc['Cash and Cash Equivalents']
+    cash_df = _get_statement_row(balance_sheet_statements_fmp, 'Cash and Cash Equivalents', 'CashAndCashEquivalents')
     cash_on_hand = cash_df.iloc[-1]
-    current_assets = balance_sheet_statements_fmp.loc['Total Current Assets']
-    current_liabilities = balance_sheet_statements_fmp.loc['Total Current Liabilities']
-    intangible_assets = balance_sheet_statements_fmp.loc['Intangible Assets']
-    total_assets = balance_sheet_statements_fmp.loc['Total Assets']
-    total_liabilities = balance_sheet_statements_fmp.loc['Total Liabilities']
+    current_assets = _get_statement_row(balance_sheet_statements_fmp, 'Total Current Assets', 'TotalCurrentAssets')
+    current_liabilities = _get_statement_row(balance_sheet_statements_fmp, 'Total Current Liabilities',
+                                            'TotalCurrentLiabilities')
+    intangible_assets = _get_statement_row(balance_sheet_statements_fmp, 'Intangible Assets', 'IntangibleAssets',
+                                           default=0).fillna(0)
+    total_assets = _get_statement_row(balance_sheet_statements_fmp, 'Total Assets', 'TotalAssets')
+    total_liabilities = _get_statement_row(balance_sheet_statements_fmp, 'Total Liabilities', 'TotalLiabilities',
+                                           'TotalLiab', 'TotalLiabilitiesNetMinorityInterest')
     tangible_assets = total_assets - intangible_assets
     net_assets = total_assets - total_liabilities
 
@@ -70,7 +160,7 @@ def net_income_expected(cash_flow_statement_fmp, years_projection=10, decay_rate
     This function will return the net_income statistics and projections
 
     Args:
-    - cash_flow_statement_fmp: DataFrame, takes in the cashflow statement from the financial model prep.
+    - cash_flow_statement_fmp: DataFrame, takes in the cashflow statement retrieved for the ticker.
         Need to be previously downloaded.
     - years_projection int:
     - decay_rate float: weights the expected earnings to more recent years
@@ -85,7 +175,7 @@ def net_income_expected(cash_flow_statement_fmp, years_projection=10, decay_rate
     """
     # Cashflow fundamentals
     net_income = {}
-    net_income_df = cash_flow_statement_fmp.loc['Net Income']
+    net_income_df = _get_statement_row(cash_flow_statement_fmp, 'Net Income', 'NetIncome')
 
     net_income_average = net_income_df.values.mean()
 
@@ -118,7 +208,7 @@ def dividends_expected_dic(cash_flow_statement_fmp, years_projection=10):
     This function will calculate the money returned to investors either by dividends or stock buy backs
 
     Args:
-    - cash_flow_statements: takes in the cashflow statement from the financial model prep
+    - cash_flow_statements: takes in the cashflow statement retrieved for the ticker
     - years_projection: how many years into the future are you looking to project
 
     Returns:
@@ -129,7 +219,7 @@ def dividends_expected_dic(cash_flow_statement_fmp, years_projection=10):
 
     # Cashflow fundamentals
     dividends_dic = {}
-    dividends_df = - cash_flow_statement_fmp.loc['Dividends Paid']
+    dividends_df = - _get_statement_row(cash_flow_statement_fmp, 'Dividends Paid', 'DividendsPaid')
 
     dividend_average = dividends_df.values.mean()
 
@@ -163,7 +253,7 @@ def stock_buybacks_expected(cash_flow_statement_fmp, years_projection=10, decay_
     This function will calculate the value of stock buybacks using weighted linear regression.
 
     Args:
-    - cash_flow_statement_fmp: cash flow statement from the financial model preparation
+    - cash_flow_statement_fmp: cash flow statement retrieved for the ticker
     - years_projection: how many years into the future you want to project
     - decay_rate: rate of exponential decay for assigning weights (default is 0.9)
 
@@ -172,8 +262,12 @@ def stock_buybacks_expected(cash_flow_statement_fmp, years_projection=10, decay_
     """
     # Cashflow fundamentals
     stock_buybacks_dic = {}
-    stock_buybacks_df = (-cash_flow_statement_fmp.loc['Common Stock Purchased']
-                         - cash_flow_statement_fmp.loc['Common Stock Issued'])
+    stock_buybacks_df = (- _get_statement_row(cash_flow_statement_fmp, 'Common Stock Purchased',
+                                             'Repurchase Of Capital Stock', 'RepurchaseOfCapitalStock',
+                                             'RepurchaseOfStock', 'CommonStockRepurchased')
+                         - _get_statement_row(cash_flow_statement_fmp, 'Common Stock Issued',
+                                             'Issuance Of Capital Stock', 'IssuanceOfCapitalStock',
+                                             'IssuanceOfStock', 'CommonStockIssued', default=0))
 
     buyback_average = stock_buybacks_df.values.mean()
 
@@ -210,7 +304,7 @@ def earnings_return_to_shareholders(cash_flow_statement_fmp, years_projection=10
     This function will calculate the earnings returned to investors either by dividends or stock buy backs
 
     Args:
-    - cash_flow_statements: takes in the cashflow statement from the financial model prep
+    - cash_flow_statements: takes in the cashflow statement retrieved for the ticker
 
     Returns:
     - dividends: the dividends paid to shareholders
@@ -221,11 +315,11 @@ def earnings_return_to_shareholders(cash_flow_statement_fmp, years_projection=10
     - retained_earnings: Net_income - total_value_returned
     """
     total_earnings_returned = {}
-    dividends_dic = dividends_expected(cash_flow_statement_fmp, years_projection)
+    dividends_dic = dividends_expected_dic(cash_flow_statement_fmp, years_projection)
     buybacks_dic = stock_buybacks_expected(cash_flow_statement_fmp, years_projection)
 
-    total_earnings_returned['past_value'] = dividends_dic['dividends_df'] + dividends_dic['stock_buybacks_df']
-    total_earnings_returned['future_value'] = buybacks_dic['expected_dividend'] + buybacks_dic['expected_buyback']
+    total_earnings_returned['past_value'] = dividends_dic['dividends_df'] + buybacks_dic['stock_buybacks_df']
+    total_earnings_returned['future_value'] = dividends_dic['expected_dividend'] + buybacks_dic['expected_buyback']
 
     return total_earnings_returned
 
@@ -239,7 +333,7 @@ def get_owners_earnings(balance_sheet_statements_fmp, cash_flow_statement_fmp):
                             - any income from unsustainable sources
 
     Args:
-    - cash_flow_statements: takes in the cashflow statement from the financial model prep
+    - cash_flow_statements: takes in the cashflow statement retrieved for the ticker
 
     Returns:
     - owners_earnings float:
@@ -259,7 +353,7 @@ def get_invested_capital(balance_sheet_statements_fmp):
                             - any income from unsustainable sources
 
     Args:
-    - cash_flow_statements: takes in the cashflow statement from the financial model prep
+    - cash_flow_statements: takes in the cashflow statement retrieved for the ticker
 
     Returns:
     - owners_earnings float:
@@ -274,7 +368,7 @@ def get_debt_calls(_sheet_statements_fmp):
     Calculates how much debt held by the company & how much that company will need to pay annually to service the debts
 
     Args:
-    - Cashflow_statements: takes in the cashflow statement from the financial model prep
+    - Cashflow_statements: takes in the cashflow statement retrieved for the ticker
 
     Returns:
     - owners_earnings float:
