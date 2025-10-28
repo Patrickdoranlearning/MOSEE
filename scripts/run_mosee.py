@@ -1,22 +1,15 @@
 import os
-import yfinance as yf
-
 import pandas as pd
 from datetime import datetime
-from financetoolkit import Toolkit
 
 from MOSEE.MOS import mos_dollar
-from MOSEE.data_retrieval.fundamental_data import net_income_expected
-from MOSEE.data_retrieval.market_data import get_stock_data, convert_currency
-from MOSEE.fundamental_analysis.indicators import get_earnings_equity
-from MOSEE.fundamental_analysis.valuation import (dcf_valuation, pad_valuation, calculate_average_price, book_value)
-
+from MOSEE.data_retrieval.fundamental_data import fundamental_downloads, net_income_expected
 from MOSEE.data_retrieval.fundamental_data import balance_sheet_data_dic, dividends_expected_dic
-
-from MOSEE.fundamental_analysis.valuation import pad_valuation_dividend
-
+from MOSEE.data_retrieval.market_data import convert_currency, currency_api_key, get_stock_data, get_ticker_info
+from MOSEE.fundamental_analysis.indicators import get_earnings_equity
+from MOSEE.fundamental_analysis.valuation import (dcf_valuation, pad_valuation, calculate_average_price, book_value,
+                                                  pad_valuation_dividend)
 from MOSEE.fundamental_analysis.indicators import set_early_screen
-
 
 def create_MOSEE_df(ticker_df, forex_data_df, start_date, end_date, API_KEY):
     """
@@ -25,12 +18,11 @@ def create_MOSEE_df(ticker_df, forex_data_df, start_date, end_date, API_KEY):
     This function will look through many tickers to try find companies with a high margin of safety and high earnings
     to equity, i will also include assetlightness and if two stocks have the same or similar metrics this will help decide
     which is a better option for investment
-
     Args:
     - ticker_df: DataFrame containing all tickers
     - start_date: how many years in the past are we looking to go
     - end_date: if we want to back test we can use this
-    - API_key: this is the api key for FMP
+    - API_key: retained for backwards compatibility; not required for Yahoo Finance data
 
     Returns:
     - DataFrame: DataFrame containing the shortlist of stocks to invest in
@@ -63,15 +55,22 @@ def create_MOSEE_df(ticker_df, forex_data_df, start_date, end_date, API_KEY):
                     continue
 
                 # Get Fundamental Data
-                financial_prep = Toolkit([ticker], api_key=API_KEY, start_date=start_date, end_date=end_date,
-                                         convert_currency=False)
-                cash_flow = financial_prep.get_cash_flow_statement()
-                balance_sheet = financial_prep.get_balance_sheet_statement()
-                currency = financial_prep.get_statistics_statement()
-                reported_currency = currency.loc['Reported Currency', '2022']
+                fundamentals = fundamental_downloads(ticker, API_KEY, start_date=start_date)
+                cash_flow = fundamentals.get('cash_flow_statements')
+                balance_sheet = fundamentals.get('balance_sheet_statements')
+                reported_currency = None
+
+                try:
+                    ticker_info = get_ticker_info(ticker)
+                    reported_currency = ticker_info.get('financialCurrency') or ticker_info.get('financial_currency')
+                except Exception:
+                    print('Unable to determine reported currency from ticker info; assuming market currency')
+
+                if not reported_currency:
+                    reported_currency = stock_currency
                 print('finished all downloads and reported currency ')
                 # check to see if api has collected data
-                if cash_flow is None or cash_flow.empty:
+                if cash_flow is None or cash_flow.empty or balance_sheet is None or balance_sheet.empty:
                     print(f"No data found for {ticker}. Skipping...")
                     continue
 
@@ -79,8 +78,9 @@ def create_MOSEE_df(ticker_df, forex_data_df, start_date, end_date, API_KEY):
                 if reported_currency != stock_currency:
                     print('exchanging')
                     cash_flow, forex_data_df = convert_currency(cash_flow, reported_currency, stock_currency,
-                                                                forex_data_df)
-                    balance_sheet = convert_currency(balance_sheet, reported_currency, stock_currency)
+                                                                forex_data_df, currency_api_key)
+                    balance_sheet, forex_data_df = convert_currency(balance_sheet, reported_currency, stock_currency,
+                                                                    forex_data_df, currency_api_key)
 
                 net_income_dic = net_income_expected(cash_flow, 10)
                 balance_sheet_dic = balance_sheet_data_dic(balance_sheet)
