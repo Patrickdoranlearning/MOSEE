@@ -8,6 +8,7 @@ stock analysis results using PostgreSQL (Vercel Postgres).
 import os
 from datetime import datetime, date
 from typing import Dict, Any, List, Optional
+from urllib.parse import urlparse, parse_qs
 import json
 
 try:
@@ -23,13 +24,36 @@ def get_connection():
     """
     Create a database connection using environment variables.
     
-    Vercel Postgres provides POSTGRES_URL or you can use individual vars.
+    Supports Neon/Vercel Postgres connection strings.
     """
     # Try Vercel's combined URL first
     database_url = os.environ.get("POSTGRES_URL") or os.environ.get("DATABASE_URL")
     
     if database_url:
-        return psycopg2.connect(database_url, cursor_factory=RealDictCursor)
+        # Parse the URL to extract components
+        # Neon URLs look like: postgres://user:pass@host/dbname?sslmode=require
+        parsed = urlparse(database_url)
+        
+        # Extract connection parameters
+        dbname = parsed.path[1:] if parsed.path else None  # Remove leading /
+        user = parsed.username
+        password = parsed.password
+        host = parsed.hostname
+        port = parsed.port or 5432
+        
+        # Parse query parameters for sslmode
+        query_params = parse_qs(parsed.query)
+        sslmode = query_params.get('sslmode', ['require'])[0]
+        
+        return psycopg2.connect(
+            dbname=dbname,
+            user=user,
+            password=password,
+            host=host,
+            port=port,
+            sslmode=sslmode,
+            cursor_factory=RealDictCursor
+        )
     
     # Fall back to individual variables
     return psycopg2.connect(
