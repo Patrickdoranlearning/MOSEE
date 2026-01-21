@@ -1,22 +1,59 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='MOSEE',  # Replace 'your_package_name' with the name of your package
-    version='0.1.0',  # Replace '0.1.0' with the version number of your package
-    description='Description of your package',
-    long_description='Long description of your package',
-    author='Your Name',
-    author_email='your.email@example.com',
-    url='https://github.com/your_username/your_package_name',
-    packages=find_packages(),  # Automatically find packages in the 'src' directory
-    install_requires=[  # List of dependencies required by your package
-        'numpy>=1.0',
-        'matplotlib>=3.0',
-        # Add other dependencies as needed
+    name='MOSEE',
+    version='2.0.0',
+    description='Margin of Safety & Earnings to Equity Stock Analyzer',
+    long_description='''
+MOSEE is a terminal-based stock investment analyzer that calculates:
+- Margin of Safety (MoS) using DCF, PAD, and Book Value methods
+- Earnings to Equity ratios
+- Combined MOSEE scores for ranking investment opportunities
+- Confidence scores based on data quality and metric consistency
+
+Features:
+- Interactive CLI for monthly stock analysis
+- PDF one-pager reports for quick stock review
+- Historical tracking and month-over-month comparisons
+- Multiple filter options (country, industry, market cap)
+- Uses FREE APIs (yfinance, forex_python)
+    ''',
+    author='Patrick Doran',
+    author_email='patrick@example.com',
+    url='https://github.com/patrickdoran/MOSEE',
+    packages=find_packages(),
+    include_package_data=True,
+    install_requires=[
+        # Data retrieval
+        'yfinance>=0.2.0',
+        'forex-python>=1.8',
+        # Data processing
+        'pandas>=2.0.0',
+        'numpy>=1.24.0',
+        'scikit-learn>=1.3.0',
+        # Visualization
+        'matplotlib>=3.7.0',
+        # CLI and terminal display
+        'click>=8.1.0',
+        'rich>=13.0.0',
+        # PDF generation
+        'reportlab>=4.0.0',
     ],
-    classifiers=[  # Metadata to classify your package
+    entry_points={
+        'console_scripts': [
+            'mosee=mosee_cli:cli',
+        ],
+    },
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Financial and Insurance Industry',
+        'Topic :: Office/Business :: Financial :: Investment',
         'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
     ],
+    python_requires='>=3.9',
 )

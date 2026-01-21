@@ -1,0 +1,38 @@
+name: Weekly MOSEE Analysis
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+    inputs:
+      debug_mode:
+        description: 'Run in debug mode (fewer stocks)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run MOSEE Analysis
+        env:
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+          MOSEE_DEBUG: ${{ github.event.inputs.debug_mode == 'true' && '1' || '0' }}
+        run: |
+          python scripts/run_weekly_analysis.py

@@ -1,0 +1,394 @@
+[
+  {
+    "ticker": "AAPL",
+    "company": {
+      "ticker": "AAPL",
+      "name": "Apple Inc.",
+      "country": "United States",
+      "industry": "Consumer Electronics",
+      "cap_size": "mega",
+      "currency": "USD"
+    },
+    "analysis_date": "2026-01-21",
+    "confidence": {
+      "level": "HIGH",
+      "score": 85,
+      "data_quality_score": 90,
+      "metric_consistency_score": 80
+    },
+    "valuations": {
+      "dcf": 2850000000000,
+      "pad": 2650000000000,
+      "pad_dividend": 450000000000,
+      "book": 62000000000,
+      "market_average": 175.50
+    },
+    "mos_scores": {
+      "dcf_mos": 0.98,
+      "pad_mos": 0.85,
+      "pad_dividend_mos": 2.1,
+      "book_mos": 45.2,
+      "market_mos": 1.05
+    },
+    "mosee_scores": {
+      "dcf_mosee": 0.0312,
+      "pad_mosee": 0.0358,
+      "pad_dividend_mosee": 0.0145,
+      "book_mosee": 0.0007,
+      "market_mosee": 0.029
+    },
+    "market_data": {
+      "current_price": 185.50,
+      "market_cap": 2800000000000,
+      "earnings_per_share": 6.42,
+      "earnings_equity": 0.0305
+    },
+    "recommendation": "HOLD",
+    "recommendation_reasons": ["Fair value: MoS of 0.85", "Good earnings yield: 3.05% per dollar equity", "High confidence in analysis"],
+    "rank": 1,
+    "percentile": 95.0
+  },
+  {
+    "ticker": "MSFT",
+    "company": {
+      "ticker": "MSFT",
+      "name": "Microsoft Corporation",
+      "country": "United States",
+      "industry": "Software - Infrastructure",
+      "cap_size": "mega",
+      "currency": "USD"
+    },
+    "analysis_date": "2026-01-21",
+    "confidence": {
+      "level": "HIGH",
+      "score": 88,
+      "data_quality_score": 92,
+      "metric_consistency_score": 84
+    },
+    "valuations": {
+      "dcf": 3100000000000,
+      "pad": 2900000000000,
+      "pad_dividend": 380000000000,
+      "book": 206000000000,
+      "market_average": 365.20
+    },
+    "mos_scores": {
+      "dcf_mos": 0.92,
+      "pad_mos": 0.78,
+      "pad_dividend_mos": 1.85,
+      "book_mos": 13.8,
+      "market_mos": 1.12
+    },
+    "mosee_scores": {
+      "dcf_mosee": 0.0385,
+      "pad_mosee": 0.0455,
+      "pad_dividend_mosee": 0.0192,
+      "book_mosee": 0.0026,
+      "market_mosee": 0.0317
+    },
+    "market_data": {
+      "current_price": 410.25,
+      "market_cap": 2850000000000,
+      "earnings_per_share": 11.05,
+      "earnings_equity": 0.0355
+    },
+    "recommendation": "BUY",
+    "recommendation_reasons": ["Good value: MoS of 0.78", "Strong earnings yield: 3.55% per dollar equity", "High confidence in analysis"],
+    "rank": 2,
+    "percentile": 90.0
+  },
+  {
+    "ticker": "GOOGL",
+    "company": {
+      "ticker": "GOOGL",
+      "name": "Alphabet Inc.",
+      "country": "United States",
+      "industry": "Internet Content & Information",
+      "cap_size": "mega",
+      "currency": "USD"
+    },
+    "analysis_date": "2026-01-21",
+    "confidence": {
+      "level": "HIGH",
+      "score": 82,
+      "data_quality_score": 88,
+      "metric_consistency_score": 76
+    },
+    "valuations": {
+      "dcf": 2100000000000,
+      "pad": 1950000000000,
+      "pad_dividend": 0,
+      "book": 283000000000,
+      "market_average": 142.80
+    },
+    "mos_scores": {
+      "dcf_mos": 0.88,
+      "pad_mos": 0.72,
+      "pad_dividend_mos": null,
+      "book_mos": 6.5,
+      "market_mos": 1.08
+    },
+    "mosee_scores": {
+      "dcf_mosee": 0.0425,
+      "pad_mosee": 0.052,
+      "pad_dividend_mosee": null,
+      "book_mosee": 0.0058,
+      "market_mosee": 0.0347
+    },
+    "market_data": {
+      "current_price": 155.40,
+      "market_cap": 1850000000000,
+      "earnings_per_share": 5.80,
+      "earnings_equity": 0.0375
+    },
+    "recommendation": "BUY",
+    "recommendation_reasons": ["Good value: MoS of 0.72", "Strong earnings yield: 3.75% per dollar equity", "High confidence in analysis"],
+    "rank": 3,
+    "percentile": 85.0
+  },
+  {
+    "ticker": "NVDA",
+    "company": {
+      "ticker": "NVDA",
+      "name": "NVIDIA Corporation",
+      "country": "United States",
+      "industry": "Semiconductors",
+      "cap_size": "mega",
+      "currency": "USD"
+    },
+    "analysis_date": "2026-01-21",
+    "confidence": {
+      "level": "MEDIUM",
+      "score": 68,
+      "data_quality_score": 85,
+      "metric_consistency_score": 51
+    },
+    "valuations": {
+      "dcf": 1800000000000,
+      "pad": 1650000000000,
+      "pad_dividend": 15000000000,
+      "book": 42000000000,
+      "market_average": 485.50
+    },
+    "mos_scores": {
+      "dcf_mos": 1.65,
+      "pad_mos": 1.45,
+      "pad_dividend_mos": 18.5,
+      "book_mos": 70.8,
+      "market_mos": 1.85
+    },
+    "mosee_scores": {
+      "dcf_mosee": 0.0182,
+      "pad_mosee": 0.0207,
+      "pad_dividend_mosee": 0.0016,
+      "book_mosee": 0.0004,
+      "market_mosee": 0.0162
+    },
+    "market_data": {
+      "current_price": 895.20,
+      "market_cap": 2980000000000,
+      "earnings_per_share": 12.95,
+      "earnings_equity": 0.03
+    },
+    "recommendation": "HOLD",
+    "recommendation_reasons": ["Overvalued: MoS of 1.45 (paying $1.45 for $1)", "Good earnings yield: 3.00%", "Medium confidence due to metric disagreement"],
+    "rank": 4,
+    "percentile": 80.0
+  },
+  {
+    "ticker": "META",
+    "company": {
+      "ticker": "META",
+      "name": "Meta Platforms Inc.",
+      "country": "United States",
+      "industry": "Internet Content & Information",
+      "cap_size": "mega",
+      "currency": "USD"
+    },
+    "analysis_date": "2026-01-21",
+    "confidence": {
+      "level": "HIGH",
+      "score": 79,
+      "data_quality_score": 86,
+      "metric_consistency_score": 72
+    },
+    "valuations": {
+      "dcf": 1450000000000,
+      "pad": 1320000000000,
+      "pad_dividend": 85000000000,
+      "book": 155000000000,
+      "market_average": 325.40
+    },
+    "mos_scores": {
+      "dcf_mos": 0.82,
+      "pad_mos": 0.68,
+      "pad_dividend_mos": 3.2,
+      "book_mos": 7.2,
+      "market_mos": 1.52
+    },
+    "mosee_scores": {
+      "dcf_mosee": 0.0512,
+      "pad_mosee": 0.0618,
+      "pad_dividend_mosee": 0.0131,
+      "book_mosee": 0.0058,
+      "market_mosee": 0.0276
+    },
+    "market_data": {
+      "current_price": 495.80,
+      "market_cap": 1190000000000,
+      "earnings_per_share": 14.85,
+      "earnings_equity": 0.042
+    },
+    "recommendation": "BUY",
+    "recommendation_reasons": ["Good value: MoS of 0.68 (buying $1 for $0.68)", "Strong earnings yield: 4.20%", "High confidence in analysis"],
+    "rank": 5,
+    "percentile": 75.0
+  },
+  {
+    "ticker": "AMZN",
+    "company": {
+      "ticker": "AMZN",
+      "name": "Amazon.com Inc.",
+      "country": "United States",
+      "industry": "Internet Retail",
+      "cap_size": "mega",
+      "currency": "USD"
+    },
+    "analysis_date": "2026-01-21",
+    "confidence": {
+      "level": "HIGH",
+      "score": 81,
+      "data_quality_score": 88,
+      "metric_consistency_score": 74
+    },
+    "valuations": {
+      "dcf": 2050000000000,
+      "pad": 1880000000000,
+      "pad_dividend": 0,
+      "book": 201000000000,
+      "market_average": 152.30
+    },
+    "mos_scores": {
+      "dcf_mos": 0.95,
+      "pad_mos": 0.82,
+      "pad_dividend_mos": null,
+      "book_mos": 9.7,
+      "market_mos": 1.28
+    },
+    "mosee_scores": {
+      "dcf_mosee": 0.0295,
+      "pad_mosee": 0.0342,
+      "pad_dividend_mosee": null,
+      "book_mosee": 0.0029,
+      "market_mosee": 0.0219
+    },
+    "market_data": {
+      "current_price": 195.40,
+      "market_cap": 1950000000000,
+      "earnings_per_share": 5.45,
+      "earnings_equity": 0.028
+    },
+    "recommendation": "HOLD",
+    "recommendation_reasons": ["Fair value: MoS of 0.82", "Moderate earnings yield: 2.80%", "High confidence in analysis"],
+    "rank": 6,
+    "percentile": 70.0
+  },
+  {
+    "ticker": "BRK-B",
+    "company": {
+      "ticker": "BRK-B",
+      "name": "Berkshire Hathaway Inc.",
+      "country": "United States",
+      "industry": "Insurance - Diversified",
+      "cap_size": "mega",
+      "currency": "USD"
+    },
+    "analysis_date": "2026-01-21",
+    "confidence": {
+      "level": "HIGH",
+      "score": 92,
+      "data_quality_score": 95,
+      "metric_consistency_score": 89
+    },
+    "valuations": {
+      "dcf": 950000000000,
+      "pad": 920000000000,
+      "pad_dividend": 0,
+      "book": 561000000000,
+      "market_average": 385.20
+    },
+    "mos_scores": {
+      "dcf_mos": 0.72,
+      "pad_mos": 0.58,
+      "pad_dividend_mos": null,
+      "book_mos": 1.22,
+      "market_mos": 1.15
+    },
+    "mosee_scores": {
+      "dcf_mosee": 0.0625,
+      "pad_mosee": 0.0775,
+      "pad_dividend_mosee": null,
+      "book_mosee": 0.0369,
+      "market_mosee": 0.0391
+    },
+    "market_data": {
+      "current_price": 445.80,
+      "market_cap": 685000000000,
+      "earnings_per_share": 30.85,
+      "earnings_equity": 0.045
+    },
+    "recommendation": "STRONG BUY",
+    "recommendation_reasons": ["Exceptional value: MoS of 0.58 (buying $1 for $0.58)", "Strong earnings yield: 4.50%", "High confidence in analysis"],
+    "rank": 7,
+    "percentile": 98.0
+  },
+  {
+    "ticker": "V",
+    "company": {
+      "ticker": "V",
+      "name": "Visa Inc.",
+      "country": "United States",
+      "industry": "Credit Services",
+      "cap_size": "mega",
+      "currency": "USD"
+    },
+    "analysis_date": "2026-01-21",
+    "confidence": {
+      "level": "HIGH",
+      "score": 86,
+      "data_quality_score": 90,
+      "metric_consistency_score": 82
+    },
+    "valuations": {
+      "dcf": 620000000000,
+      "pad": 580000000000,
+      "pad_dividend": 125000000000,
+      "book": 38000000000,
+      "market_average": 265.40
+    },
+    "mos_scores": {
+      "dcf_mos": 0.78,
+      "pad_mos": 0.65,
+      "pad_dividend_mos": 2.8,
+      "book_mos": 12.5,
+      "market_mos": 1.08
+    },
+    "mosee_scores": {
+      "dcf_mosee": 0.0538,
+      "pad_mosee": 0.0646,
+      "pad_dividend_mosee": 0.015,
+      "book_mosee": 0.0034,
+      "market_mosee": 0.0389
+    },
+    "market_data": {
+      "current_price": 285.60,
+      "market_cap": 485000000000,
+      "earnings_per_share": 9.15,
+      "earnings_equity": 0.042
+    },
+    "recommendation": "BUY",
+    "recommendation_reasons": ["Good value: MoS of 0.65", "Strong earnings yield: 4.20%", "High confidence in analysis"],
+    "rank": 8,
+    "percentile": 88.0
+  }
+]
