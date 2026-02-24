@@ -214,26 +214,39 @@ def _is_empty_response(result: Any) -> bool:
     return False
 
 
-def _track_empty_response(is_empty: bool):
+def _track_empty_response(is_empty: bool, ticker: str = ""):
     """
     Track consecutive empty responses. Multiple empty responses in a row
-    likely indicate silent rate limiting.
+    likely indicate silent rate limiting, but individual empty responses
+    may just be bad/delisted tickers.
+
+    Args:
+        is_empty: Whether the response was empty
+        ticker: Optional ticker symbol for logging
+
+    Returns:
+        True if we should back off (likely rate limited), False otherwise
     """
     global _empty_response_count
-    
+
     with _empty_response_lock:
         if is_empty:
             _empty_response_count += 1
             threshold = _rate_limit_settings['empty_response_threshold']
-            
+
             if _empty_response_count >= threshold:
                 print(f"Warning: {_empty_response_count} consecutive empty responses detected. "
-                      "This may indicate silent rate limiting.")
+                      "This likely indicates silent rate limiting.")
                 _empty_response_count = 0  # Reset counter
                 return True  # Signal that we should back off
+            else:
+                # Single empty response is likely a bad ticker, not rate limiting
+                if ticker:
+                    print(f"    Note: Empty response for {ticker} (may be delisted or have no data)")
+                return False
         else:
             _empty_response_count = 0  # Reset on successful response
-    
+
     return False
 
 
@@ -386,20 +399,20 @@ def download_stock_data(ticker: str, start: str, end: str, progress: bool = Fals
 def get_ticker_info(ticker: str) -> dict:
     """
     Get ticker info with rate limiting and caching.
-    Uses fast_info first, falls back to full info if needed.
+    Uses fast_info first, then supplements with full info for financialCurrency.
     Reuses Ticker objects to minimize API calls.
     """
     cache_key = f"ticker_info|{ticker}"
     cached = _get_from_cache(cache_key)
     if cached is not None:
         return cached
-    
+
     _wait_for_rate_limit()
-    
+
     try:
         # Use cached Ticker object
         tick = _get_cached_ticker(ticker)
-        
+
         # Try fast_info first (faster, less likely to hit rate limits)
         info = {}
         try:
@@ -412,9 +425,10 @@ def get_ticker_info(ticker: str) -> dict:
             }
         except Exception:
             pass
-        
-        # If fast_info didn't work well, try full info
-        if not info.get('market_cap') or not info.get('shares'):
+
+        # Always try to get full info for financialCurrency (needed for international stocks)
+        # fast_info doesn't include financialCurrency which is critical for currency conversion
+        if not info.get('financialCurrency') or not info.get('market_cap') or not info.get('shares'):
             _wait_for_rate_limit()
             try:
                 full_info = tick.info

@@ -112,9 +112,17 @@ def calculate_return_on_capital(
         Return on Capital as decimal (0.20 = 20%)
     """
     tangible_capital = net_working_capital + net_fixed_assets
+    # Guard against near-zero or negative tangible capital (common in banks, insurance,
+    # or companies with large negative working capital). Cap ROC to prevent distortions.
     if tangible_capital <= 0:
+        # Negative tangible capital can mean asset-light business (potentially good)
+        # or financial company. Return a capped positive value if EBIT is positive.
+        if tangible_capital != 0 and ebit > 0:
+            return min(0.50, ebit / abs(tangible_capital))
         return 0.0
-    return ebit / tangible_capital
+    roc = ebit / tangible_capital
+    # Cap at 100% to prevent distortions from very small tangible capital
+    return min(roc, 1.0)
 
 
 def calculate_magic_formula_metrics(

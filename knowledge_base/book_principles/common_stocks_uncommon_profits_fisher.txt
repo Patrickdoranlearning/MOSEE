@@ -1,0 +1,113 @@
+COMMON STOCKS AND UNCOMMON PROFITS — Philip A. Fisher
+Key Principles for Analyzing Companies
+
+=== FISHER'S 15 POINTS TO LOOK FOR IN A COMMON STOCK ===
+
+When reading a company's annual report and researching a potential investment, Fisher evaluated these 15 dimensions. Each can be partially assessed from annual report filings:
+
+1. GROWTH POTENTIAL: Does the company have products or services with sufficient market potential to make possible a sizable increase in sales for at least several years?
+   - Look at revenue growth trajectory in the income statement
+   - Read the MD&A for management's discussion of addressable market
+   - Is the company gaining or losing market share?
+
+2. MANAGEMENT'S COMMITMENT TO GROWTH: Does management have a determination to continue developing products or processes that will further increase total sales potential?
+   - Look for R&D spending as a percentage of revenue
+   - Are they investing in new products, or milking existing ones?
+   - Read about capital expenditure plans
+
+3. R&D EFFECTIVENESS: How effective are the company's research and development efforts in relation to its size?
+   - Compare R&D spend to competitors
+   - What products or innovations has R&D produced recently?
+   - Is R&D spending growing or shrinking?
+
+4. SALES ORGANIZATION: Does the company have an above-average sales organization?
+   - Look at revenue per employee trends
+   - Is the company gaining customers or losing them?
+   - What does customer retention look like?
+
+5. PROFIT MARGINS: Does the company have a worthwhile profit margin?
+   - Track gross margin, operating margin, and net margin over time
+   - Are margins expanding or contracting?
+   - How do margins compare to industry peers?
+
+6. IMPROVING MARGINS: What is the company doing to maintain or improve profit margins?
+   - Look for discussion of cost management, pricing power, efficiency
+   - Is the company investing to reduce costs?
+   - Scale advantages showing up in margins?
+
+7. LABOR RELATIONS: Does the company have outstanding labor and personnel relations?
+   - Read about employee satisfaction, turnover, labor disputes
+   - Does the company invest in training and development?
+   - "A company in which there is a well-established feeling among its workers that it is a good place to work is a company in which there is likely to be an esprit de corps."
+
+8. EXECUTIVE RELATIONS: Does the company have outstanding executive relations?
+   - Is there depth of management, or is success dependent on one person?
+   - Are executives promoted from within?
+   - Is there a clear succession plan?
+
+9. MANAGEMENT DEPTH: Does the company have depth to its management?
+   - "The company that can grow only as far as its founder can personally direct operations will not grow very far."
+   - Look for evidence of delegated authority and talented lieutenants
+
+10. COST ANALYSIS: How good are the company's cost analysis and accounting controls?
+    - Does the company break out segment reporting clearly?
+    - Can you understand where profits come from?
+    - Are cost structures transparent?
+
+11. COMPETITIVE ADVANTAGES: Are there other aspects of the business that give the investor clues as to how outstanding the company may be in relation to its competition?
+    - Patents, proprietary technology, regulatory advantages
+    - Customer switching costs
+    - Network effects, platform advantages
+
+12. LONG-RANGE OUTLOOK ON PROFITS: Does the company have a short-range or long-range outlook in regard to profits?
+    - Is management sacrificing long-term value for short-term earnings?
+    - Are they investing heavily now for future growth?
+    - Do they discuss 3-5 year plans, or only quarter-to-quarter?
+
+13. EQUITY DILUTION: Will growth require equity financing that will dilute existing shareholders?
+    - Look at shares outstanding over time — is it growing?
+    - Stock-based compensation levels
+    - Are buybacks genuine return of capital or just offsetting dilution from options?
+
+14. MANAGEMENT COMMUNICATION: Does management talk freely about its affairs when things are going well but clam up when troubles and disappointments occur?
+    - "The management that candidly discusses its problems is the one that usually solves them."
+    - Compare tone of this year's letter with last year's
+    - Do they address disappointments honestly?
+
+15. MANAGEMENT INTEGRITY: Does the company have a management of unquestionable integrity?
+    - Related party transactions
+    - Insider trading patterns
+    - Does management enrich itself at shareholder expense?
+
+=== THE SCUTTLEBUTT METHOD ===
+
+Fisher advocated extensive qualitative research beyond annual reports:
+- Talk to competitors about the company
+- Talk to customers about the company
+- Talk to suppliers about the company
+- Talk to former employees
+
+While we can't do this from annual reports alone, AI can look for:
+- Customer concentration (revenue dependency on few customers)
+- Supplier mentions and relationships
+- Competitor mentions and positioning
+- Industry dynamics discussed in Risk Factors
+
+=== FISHER ON WHEN TO SELL ===
+
+Fisher believed in holding great companies for very long periods. Sell only if:
+1. You made a mistake in your original assessment
+2. The company no longer qualifies on the 15 points
+3. A significantly better opportunity exists
+
+"If the job has been correctly done when a common stock is purchased, the time to sell it is — almost never."
+
+=== FISHER ON GROWTH ===
+
+"Sales growth is the engine that drives everything. A company cannot sustain growing profits without growing sales."
+
+In annual reports, Fisher prioritized:
+- Organic revenue growth (not acquisition-driven)
+- Revenue CAGR over 5-10 years
+- Whether growth is accelerating or decelerating
+- The quality of growth (profitable growth vs unprofitable growth)

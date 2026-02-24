@@ -101,6 +101,10 @@ class MOSEEIntelligenceReport:
     strengths: List[str]
     concerns: List[str]
     action_items: List[str]
+
+    # Transparency data
+    verdict_rationale: Dict[str, Any] = field(default_factory=dict)
+    quality_breakdown: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -122,7 +126,9 @@ class MOSEEIntelligenceReport:
             "confidence": self.confidence,
             "strengths": self.strengths,
             "concerns": self.concerns,
-            "action_items": self.action_items
+            "action_items": self.action_items,
+            "verdict_rationale": self.verdict_rationale,
+            "quality_breakdown": self.quality_breakdown
         }
     
     def summary(self) -> str:
@@ -226,28 +232,100 @@ def _create_graham_lens(metrics: Dict[str, Any], mos: float) -> InvestmentLens:
 
 
 def _create_buffett_lens(metrics: Dict[str, Any], quality_score: float) -> InvestmentLens:
-    """Create Buffett's perspective on the investment."""
+    """
+    Create Buffett's perspective on the investment.
+
+    Buffett looks for:
+    1. Durable competitive advantage (moat)
+    2. Consistent high ROE (>15%)
+    3. Strong ROIC (>12%)
+    4. Manageable debt
+    5. Quality management
+
+    Note: Some great businesses like Berkshire itself may not fit standard
+    metrics due to unique accounting or capital structure.
+    """
     roe = metrics.get('roe', 0)
     roic = metrics.get('roic', 0)
     debt_to_equity = metrics.get('debt_to_equity', 1)
     owner_earnings_yield = metrics.get('owner_earnings_yield', 0)
-    
+    interest_coverage = metrics.get('interest_coverage', 0)
+
     # Buffett cares about quality first
     buffett_score = quality_score
-    
-    if roe >= 0.15 and roic >= 0.12 and debt_to_equity < 0.5:
+
+    # Calculate a Buffett-specific quality score based on his key metrics
+    buffett_quality_points = 0
+
+    # ROE contribution (max 30 points)
+    if roe >= 0.20:
+        buffett_quality_points += 30
+    elif roe >= 0.15:
+        buffett_quality_points += 25
+    elif roe >= 0.12:
+        buffett_quality_points += 18
+    elif roe >= 0.10:
+        buffett_quality_points += 12
+
+    # ROIC contribution (max 25 points)
+    if roic >= 0.20:
+        buffett_quality_points += 25
+    elif roic >= 0.15:
+        buffett_quality_points += 20
+    elif roic >= 0.12:
+        buffett_quality_points += 15
+    elif roic >= 0.10:
+        buffett_quality_points += 10
+
+    # Debt management contribution (max 20 points)
+    if debt_to_equity <= 0.3:
+        buffett_quality_points += 20
+    elif debt_to_equity <= 0.5:
+        buffett_quality_points += 15
+    elif debt_to_equity <= 1.0:
+        buffett_quality_points += 10
+    elif debt_to_equity <= 1.5:
+        buffett_quality_points += 5
+
+    # Interest coverage contribution (max 15 points)
+    if interest_coverage >= 10:
+        buffett_quality_points += 15
+    elif interest_coverage >= 5:
+        buffett_quality_points += 12
+    elif interest_coverage >= 3:
+        buffett_quality_points += 8
+    elif interest_coverage >= 1.5:
+        buffett_quality_points += 4
+
+    # Owner earnings yield contribution (max 10 points)
+    if owner_earnings_yield >= 0.10:
+        buffett_quality_points += 10
+    elif owner_earnings_yield >= 0.07:
+        buffett_quality_points += 8
+    elif owner_earnings_yield >= 0.05:
+        buffett_quality_points += 5
+
+    # Use the higher of composite score or Buffett-specific score
+    buffett_score = max(quality_score, buffett_quality_points)
+
+    # Determine verdict and grade based on Buffett quality points
+    if buffett_quality_points >= 75:
         verdict = "Quality Business"
-        grade = "A" if buffett_score >= 75 else "B"
-        insight = f"Excellent economics: ROE {roe:.1%}, ROIC {roic:.1%}, manageable debt."
-    elif roe >= 0.12 and roic >= 0.10:
+        grade = "A"
+        insight = f"Excellent economics: ROE {roe:.1%}, ROIC {roic:.1%}, manageable debt. Buffett's ideal."
+    elif buffett_quality_points >= 60:
+        verdict = "Quality Business"
+        grade = "B"
+        insight = f"Strong economics: ROE {roe:.1%}, ROIC {roic:.1%}. Good Buffett candidate."
+    elif buffett_quality_points >= 45:
         verdict = "Good Business"
-        grade = "B" if buffett_score >= 60 else "C"
-        insight = f"Good economics: ROE {roe:.1%}, ROIC {roic:.1%}."
+        grade = "C"
+        insight = f"Solid economics: ROE {roe:.1%}, ROIC {roic:.1%}. Acceptable but not exceptional."
     else:
         verdict = "Mediocre Business"
-        grade = "C" if roe >= 0.08 else "D"
-        insight = f"Average economics: ROE {roe:.1%}. Buffett would want better."
-    
+        grade = "D" if buffett_quality_points >= 25 else "F"
+        insight = f"Weak economics: ROE {roe:.1%}. Buffett would likely pass."
+
     return InvestmentLens(
         philosopher="Buffett",
         score=buffett_score,
@@ -263,7 +341,18 @@ def _create_lynch_lens(metrics: Dict[str, Any]) -> InvestmentLens:
     peg = metrics.get('peg_ratio')
     growth = metrics.get('earnings_growth', 0)
     category = metrics.get('lynch_category', 'Unknown')
-    
+
+    # Negative growth makes PEG meaningless — Lynch wouldn't use PEG here
+    if growth < 0:
+        return InvestmentLens(
+            philosopher="Lynch",
+            score=30,
+            grade="D",
+            key_metric=f"Growth: {growth:.1%}",
+            verdict="Declining Earnings",
+            insight=f"Earnings declining at {growth:.1%}. Lynch wouldn't use PEG for declining companies."
+        )
+
     if peg is None or peg <= 0:
         return InvestmentLens(
             philosopher="Lynch",
@@ -350,36 +439,181 @@ def _determine_verdict(
     has_mos: bool,
     quality_score: float,
     mos_ratio: float,
-    confidence: str
-) -> InvestmentVerdict:
+    confidence: str,
+    mosee_score: float = None,
+    years_to_payback: float = None
+) -> tuple:
     """
-    Determine final investment verdict.
-    
-    Key principle: ALWAYS require margin of safety.
-    Quality affects what we're willing to pay, but doesn't remove MoS requirement.
+    Determine final investment verdict with rationale.
+
+    Key principles:
+    1. ALWAYS require margin of safety.
+    2. Quality affects what we're willing to pay, but doesn't remove MoS requirement.
+    3. MOSEE score and years to payback are critical - high payback years = poor investment.
+
+    MOSEE thresholds:
+    - >= 0.15: Excellent (undervalued + strong earnings)
+    - >= 0.10: Good
+    - >= 0.05: Fair
+    - < 0.05: Below Average - NEVER buy regardless of MoS
+
+    Years to payback thresholds:
+    - <= 15: Excellent
+    - <= 25: Good
+    - <= 50: Fair
+    - > 50: Poor - NEVER buy regardless of MoS
+
+    Returns:
+        Tuple of (InvestmentVerdict, rationale_dict)
     """
     is_quality = quality_score >= 65
-    
+
+    # Build rationale as we go through each gate
+    gates = []
+    thresholds = {
+        "mosee_min": 0.05,
+        "payback_max": 50,
+        "mos_required": 0.70,
+        "quality_min": 65,
+        "strong_buy_mos": 0.50,
+        "buy_mos": 0.70,
+    }
+
+    # Gate 1: Data Quality
     if confidence == "SPECULATIVE":
-        return InvestmentVerdict.INSUFFICIENT_DATA
-    
+        gates.append({
+            "gate": "Data Quality",
+            "passed": False,
+            "detail": f"Confidence is SPECULATIVE — insufficient data for analysis"
+        })
+        rationale = {
+            "gates": gates,
+            "thresholds": thresholds,
+            "summary": "INSUFFICIENT DATA: Confidence level is SPECULATIVE. Not enough reliable data to make a recommendation."
+        }
+        return InvestmentVerdict.INSUFFICIENT_DATA, rationale
+
+    gates.append({
+        "gate": "Data Quality",
+        "passed": True,
+        "detail": f"Confidence: {confidence} (not SPECULATIVE)"
+    })
+
+    # Gate 2: Earnings Power
+    has_poor_earnings_power = False
+    earnings_details = []
+
+    if mosee_score is not None and mosee_score < 0.05:
+        has_poor_earnings_power = True
+        earnings_details.append(f"MOSEE score {mosee_score:.3f} < 0.05 threshold")
+
+    if years_to_payback is not None and years_to_payback > 50:
+        has_poor_earnings_power = True
+        earnings_details.append(f"Years to payback {years_to_payback:.0f} > 50 year threshold")
+
+    if has_poor_earnings_power:
+        gates.append({
+            "gate": "Earnings Power",
+            "passed": False,
+            "detail": "; ".join(earnings_details) + " — poor earnings power blocks any BUY rating"
+        })
+    else:
+        ep_parts = []
+        if mosee_score is not None:
+            ep_parts.append(f"MOSEE {mosee_score:.3f} >= 0.05")
+        if years_to_payback is not None:
+            ep_parts.append(f"payback {years_to_payback:.1f} yrs <= 50")
+        gates.append({
+            "gate": "Earnings Power",
+            "passed": True,
+            "detail": ", ".join(ep_parts) if ep_parts else "Acceptable earnings power"
+        })
+
+    # If poor earnings power, downgrade verdict significantly
+    if has_poor_earnings_power:
+        if mos_ratio <= 1.0:
+            verdict = InvestmentVerdict.WATCHLIST if is_quality else InvestmentVerdict.HOLD
+            gates.append({
+                "gate": "Margin of Safety",
+                "passed": True,
+                "detail": f"MoS ratio {mos_ratio:.2f} <= 1.00 (trading below intrinsic value)"
+            })
+            gates.append({
+                "gate": "Quality Check",
+                "passed": is_quality,
+                "detail": f"Quality score {quality_score:.0f} {'≥' if is_quality else '<'} 65"
+            })
+            summary = f"{verdict.value}: {'Quality company' if is_quality else 'Company'} (score {quality_score:.0f}) but poor earnings power ({'; '.join(earnings_details)}). Even with margin of safety, earnings are too low to justify a BUY."
+        elif mos_ratio <= 1.5:
+            verdict = InvestmentVerdict.REDUCE
+            gates.append({
+                "gate": "Margin of Safety",
+                "passed": False,
+                "detail": f"MoS ratio {mos_ratio:.2f} — no margin of safety"
+            })
+            summary = f"REDUCE: Poor earnings power combined with no margin of safety (MoS {mos_ratio:.0%}). Consider trimming."
+        else:
+            verdict = InvestmentVerdict.SELL if not is_quality else InvestmentVerdict.REDUCE
+            gates.append({
+                "gate": "Margin of Safety",
+                "passed": False,
+                "detail": f"MoS ratio {mos_ratio:.2f} — significantly overvalued"
+            })
+            summary = f"{verdict.value}: Poor earnings power and significantly overvalued (MoS {mos_ratio:.0%})."
+
+        rationale = {"gates": gates, "thresholds": thresholds, "summary": summary}
+        return verdict, rationale
+
+    # Gate 3: Margin of Safety
+    gates.append({
+        "gate": "Margin of Safety",
+        "passed": has_mos,
+        "detail": f"MoS ratio {mos_ratio:.2f} {'<=' if has_mos else '>'} 0.70 threshold — {'trading below' if has_mos else 'trading above'} conservative intrinsic value"
+    })
+
+    # Gate 4: Quality Check
+    gates.append({
+        "gate": "Quality Check",
+        "passed": is_quality,
+        "detail": f"Quality score {quality_score:.0f}/100 {'≥' if is_quality else '<'} 65 threshold"
+    })
+
+    # Standard verdict logic for stocks with acceptable earnings power
     if has_mos:  # Price below conservative value
         if mos_ratio <= 0.5:
-            return InvestmentVerdict.STRONG_BUY if is_quality else InvestmentVerdict.BUY
+            verdict = InvestmentVerdict.STRONG_BUY if is_quality else InvestmentVerdict.BUY
+            summary = f"{verdict.value}: {'Quality company' if is_quality else 'Company'} (score {quality_score:.0f}) trading at just {mos_ratio:.0%} of conservative value — excellent margin of safety."
         elif mos_ratio <= 0.7:
-            return InvestmentVerdict.BUY if is_quality else InvestmentVerdict.ACCUMULATE
+            verdict = InvestmentVerdict.BUY if is_quality else InvestmentVerdict.ACCUMULATE
+            summary = f"{verdict.value}: {'Quality company' if is_quality else 'Company'} (score {quality_score:.0f}) trading at {mos_ratio:.0%} of conservative value with good margin of safety."
         else:  # mos 0.7-1.0
-            return InvestmentVerdict.ACCUMULATE if is_quality else InvestmentVerdict.HOLD
+            verdict = InvestmentVerdict.ACCUMULATE if is_quality else InvestmentVerdict.HOLD
+            summary = f"{verdict.value}: Trading at {mos_ratio:.0%} of conservative value. {'Quality business worth accumulating.' if is_quality else 'Modest discount but quality concerns.'}"
     else:  # No margin of safety
         if mos_ratio <= 1.15:  # Slightly overvalued
             if is_quality:
-                return InvestmentVerdict.WATCHLIST  # Good company, wait for better price
+                verdict = InvestmentVerdict.WATCHLIST
+                summary = f"WATCHLIST: Quality company (score {quality_score:.0f}) but trading at {mos_ratio:.0%} of conservative value — no margin of safety. Wait for price below buy-below target."
             else:
-                return InvestmentVerdict.HOLD
+                verdict = InvestmentVerdict.HOLD
+                summary = f"HOLD: Trading near fair value (MoS {mos_ratio:.0%}) with below-threshold quality (score {quality_score:.0f}). No action needed."
         elif mos_ratio <= 1.5:
-            return InvestmentVerdict.REDUCE if not is_quality else InvestmentVerdict.HOLD
+            if not is_quality:
+                verdict = InvestmentVerdict.REDUCE
+                summary = f"REDUCE: Overvalued (MoS {mos_ratio:.0%}) with below-threshold quality (score {quality_score:.0f}). Consider trimming."
+            else:
+                verdict = InvestmentVerdict.HOLD
+                summary = f"HOLD: Quality company (score {quality_score:.0f}) but overvalued at {mos_ratio:.0%} of conservative value. Hold existing position but don't add."
         else:  # Significantly overvalued
-            return InvestmentVerdict.SELL if not is_quality else InvestmentVerdict.REDUCE
+            if not is_quality:
+                verdict = InvestmentVerdict.SELL
+                summary = f"SELL: Significantly overvalued (MoS {mos_ratio:.0%}) with poor quality (score {quality_score:.0f}). Exit position."
+            else:
+                verdict = InvestmentVerdict.REDUCE
+                summary = f"REDUCE: Quality company (score {quality_score:.0f}) but significantly overvalued at {mos_ratio:.0%} of conservative value. Consider trimming."
+
+    rationale = {"gates": gates, "thresholds": thresholds, "summary": summary}
+    return verdict, rationale
 
 
 def _generate_action_items(
@@ -430,15 +664,15 @@ def generate_mosee_intelligence(
 ) -> MOSEEIntelligenceReport:
     """
     Generate complete MOSEE Intelligence Report.
-    
+
     This is the main entry point for intelligent analysis.
-    
+
     Args:
         ticker: Stock ticker symbol
         current_price: Current stock price
         metrics: Dictionary containing all calculated metrics
         required_mos: Required margin of safety (default 0.7 = 30% discount)
-        
+
     Returns:
         MOSEEIntelligenceReport with full analysis
     """
@@ -446,7 +680,14 @@ def generate_mosee_intelligence(
     composite = calculate_composite_score(ticker, metrics, InvestmentStyle.BALANCED)
     quality_score = composite.total_score
     quality_grade = _calculate_quality_grade(quality_score)
-    
+
+    # Risk-adjusted MoS: cyclical/distressed companies need MORE margin of safety
+    earnings_classification = metrics.get('earnings_classification', 'Unknown')
+    if earnings_classification in ('Cyclical', 'Turnaround'):
+        required_mos = min(required_mos, 0.60)  # 40% discount required
+    elif earnings_classification == 'Distressed':
+        required_mos = min(required_mos, 0.50)  # 50% discount required
+
     # Build range-based valuation
     valuation_metrics = {
         'eps': metrics.get('eps', 0),
@@ -458,14 +699,33 @@ def generate_mosee_intelligence(
         'shares_outstanding': metrics.get('shares_outstanding', 1),
         'industry_pe': metrics.get('industry_pe', 15)
     }
-    
+
     valuation = build_composite_valuation(ticker, valuation_metrics, quality_score)
-    
+
     # Calculate margin of safety
     mos_ratio = valuation.margin_of_safety(current_price)
     has_mos = mos_ratio <= required_mos
     buy_below = valuation.composite_conservative * required_mos
-    
+
+    # Calculate MOSEE score and years to payback
+    # Earnings equity = Net Income / Market Cap (how much of market cap you earn per year)
+    earnings_equity = metrics.get('earnings_equity')
+    market_cap = metrics.get('market_cap')
+    net_income = metrics.get('net_income')
+
+    # Calculate earnings equity if not provided but we have the components
+    if earnings_equity is None and market_cap and net_income and market_cap > 0:
+        earnings_equity = net_income / market_cap
+
+    # MOSEE score = (1 / MoS) * earnings_equity
+    # Higher is better: combines value (MoS) with earnings power
+    mosee_score = None
+    years_to_payback = None
+
+    if earnings_equity is not None and earnings_equity > 0:
+        mosee_score = (1 / mos_ratio) * earnings_equity if mos_ratio > 0 else None
+        years_to_payback = min(1 / earnings_equity, 999)  # Cap at 999 years to prevent extreme values
+
     # Create multi-lens perspectives
     lenses = [
         _create_graham_lens(metrics, mos_ratio),
@@ -473,13 +733,15 @@ def generate_mosee_intelligence(
         _create_lynch_lens(metrics),
         _create_fisher_lens(metrics)
     ]
-    
-    # Determine verdict
-    verdict = _determine_verdict(
-        has_mos, 
-        quality_score, 
+
+    # Determine verdict (now considers MOSEE score and years to payback)
+    verdict, verdict_rationale = _determine_verdict(
+        has_mos,
+        quality_score,
         mos_ratio,
-        valuation.composite_confidence.value
+        valuation.composite_confidence.value,
+        mosee_score=mosee_score,
+        years_to_payback=years_to_payback
     )
     
     # Generate recommendation text
@@ -528,7 +790,37 @@ def generate_mosee_intelligence(
     if metrics.get('roe', 0) < 0.10:
         concerns.append(f"Low ROE of {metrics.get('roe', 0):.1%}")
     if metrics.get('earnings_growth', 0) < 0:
-        concerns.append("Declining earnings")
+        concerns.append(f"Declining earnings ({metrics.get('earnings_growth', 0):.1%} growth)")
+
+    # Cyclicality concerns
+    if earnings_classification == 'Cyclical':
+        concerns.append("Cyclical earnings pattern — projections use normalized (average) earnings")
+    elif earnings_classification == 'Turnaround':
+        concerns.append("Turnaround company — recovering from losses, high uncertainty")
+    elif earnings_classification == 'Distressed':
+        concerns.append("Distressed earnings — persistent losses or extreme volatility")
+
+    r_squared = metrics.get('projection_r_squared')
+    if r_squared is not None and r_squared < 0.3:
+        concerns.append(f"Low projection reliability (R²={r_squared:.2f}) — earnings too volatile to forecast")
+
+    # MOSEE and years to payback concerns
+    if years_to_payback is not None and years_to_payback > 50:
+        concerns.append(f"Extremely high years to payback ({years_to_payback:.0f} years) - poor earnings power relative to price")
+    elif years_to_payback is not None and years_to_payback > 25:
+        concerns.append(f"High years to payback ({years_to_payback:.0f} years)")
+
+    if mosee_score is not None and mosee_score < 0.05:
+        concerns.append(f"Low MOSEE score ({mosee_score:.3f}) - poor combination of value and earnings")
+
+    # MOSEE and years to payback strengths
+    if mosee_score is not None and mosee_score >= 0.15:
+        strengths.append(f"Excellent MOSEE score ({mosee_score:.3f}) - strong value and earnings")
+    elif mosee_score is not None and mosee_score >= 0.10:
+        strengths.append(f"Good MOSEE score ({mosee_score:.3f})")
+
+    if years_to_payback is not None and years_to_payback <= 15:
+        strengths.append(f"Fast payback ({years_to_payback:.1f} years)")
     
     # Generate action items
     action_items = _generate_action_items(verdict, buy_below, current_price, ticker)
@@ -548,5 +840,7 @@ def generate_mosee_intelligence(
         confidence=valuation.composite_confidence.value,
         strengths=strengths,
         concerns=concerns,
-        action_items=action_items
+        action_items=action_items,
+        verdict_rationale=verdict_rationale,
+        quality_breakdown=composite.to_dict()
     )

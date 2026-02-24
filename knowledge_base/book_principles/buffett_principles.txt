@@ -1,0 +1,98 @@
+WARREN BUFFETT'S INVESTMENT PRINCIPLES
+Distilled from Berkshire Hathaway Annual Letters (1965-2024)
+
+=== THE FOUR FILTERS ===
+
+Buffett applies four filters when evaluating any business. When reading an annual report, assess each:
+
+1. CAN I UNDERSTAND IT?
+   - "Never invest in a business you cannot understand."
+   - If the annual report is filled with complex financial engineering, derivatives, or business models you can't explain simply, move on.
+   - The best businesses are simple to understand: they make a product or service, sell it for more than it costs, and repeat.
+
+2. DOES IT HAVE A DURABLE COMPETITIVE ADVANTAGE (MOAT)?
+   - "The key to investing is not assessing how much an industry is going to affect society, but rather determining the competitive advantage of any given company and, above all, the durability of that advantage."
+   - Look for in annual reports:
+     * Brand power: Can they raise prices without losing customers?
+     * Switching costs: Is it painful for customers to leave?
+     * Network effects: Does the product become more valuable as more people use it?
+     * Cost advantages: Can they produce cheaper than anyone else?
+     * Regulatory moats: Do licenses, patents, or regulations protect them?
+   - The MD&A section often reveals whether management even thinks about competitive advantages.
+
+3. IS MANAGEMENT HONEST AND COMPETENT?
+   - "We look for three things: intelligence, energy, and integrity. And if they don't have the last one, the first two will kill you."
+   - In annual reports, look for:
+     * CANDOR: Does management discuss what went wrong, not just what went right?
+     * CAPITAL ALLOCATION: Do they invest retained earnings wisely? Track record of acquisitions?
+     * SKIN IN THE GAME: How much stock does management own? Are they buying or selling?
+     * COMPENSATION: Is executive pay reasonable relative to performance? Are options repriced?
+     * PROMISES vs RESULTS: Compare this year's results to last year's promises. Did they deliver?
+
+4. IS THE PRICE RIGHT?
+   - "Price is what you pay, value is what you get."
+   - Even a wonderful company is a bad investment at the wrong price.
+   - Buffett uses owner earnings (net income + depreciation - capex) as his primary valuation metric.
+
+=== OWNER EARNINGS ===
+
+Buffett's preferred measure of a company's true earning power:
+
+Owner Earnings = Net Income + Depreciation/Amortization - Capital Expenditures
+
+This represents the cash that could be extracted from the business without harming its competitive position. In the annual report:
+- Find net income on the income statement
+- Find depreciation on the cash flow statement
+- Find capital expenditures on the cash flow statement
+- Calculate owner earnings and track the trend over multiple years
+
+"Reported earnings per share are the starting point for analysis, not the end."
+
+=== RETURN ON EQUITY (ROE) ===
+
+"The primary test of managerial economic performance is the achievement of a high earnings rate on equity capital employed (without undue leverage or accounting gimmickry)."
+
+When reading the annual report:
+- Calculate ROE = Net Income / Shareholders' Equity
+- Look for consistently high ROE (>15%) over many years
+- Beware of high ROE driven by excessive debt (high leverage)
+- Beware of high ROE from share buybacks that shrink equity
+- The best businesses generate high ROE with low debt
+
+=== THE INSTITUTIONAL IMPERATIVE ===
+
+Buffett warns about a dangerous force in corporate behavior:
+"(1) As if governed by Newton's First Law of Motion, an institution will resist any change in its current direction; (2) Just as work expands to fill available time, corporate projects or acquisitions will materialize to soak up available funds; (3) Any business craving of the leader, however foolish, will be quickly supported by detailed rate-of-return and strategic studies prepared by his troops; and (4) The behavior of peer companies will be mindlessly imitated."
+
+In annual reports, watch for:
+- "Strategic" acquisitions that don't make financial sense
+- Expanding into areas outside competence
+- Imitating competitors instead of playing to strengths
+- Building empires rather than maximizing shareholder returns
+
+=== WHAT BUFFETT READS IN ANNUAL REPORTS ===
+
+"I read annual reports of the company I'm looking at and I read annual reports of the competitors — that's the main source of material."
+
+Specifically, Buffett looks for:
+
+1. RETURN ON INVESTED CAPITAL: What return does the business earn on the capital it deploys? Businesses that can reinvest at high rates of return compound wealth.
+
+2. PROFIT MARGINS: Are they stable, expanding, or contracting? Stable high margins suggest pricing power and competitive advantage.
+
+3. DEBT LEVELS: "I like businesses I can understand, run by people I trust, with durable competitive advantages, and that don't require a lot of leverage." Debt-free or low-debt businesses can survive downturns.
+
+4. FREE CASH FLOW: "Capital is not free. A business that earns 8-10% on capital is not earning anything exceptional." The business should generate substantial free cash flow.
+
+5. MANAGEMENT'S LETTER: "I always turn to the chairman's letter first." Is it honest, informative, and written in plain English? Or is it a PR exercise?
+
+=== BUFFETT'S RED FLAGS ===
+
+- Companies that consistently use "pro forma" or "adjusted" earnings that exclude real expenses
+- Serial acquirers who never seem to create value from their purchases
+- Companies that restructure repeatedly
+- Managements that blame external factors for poor results
+- Excessive use of stock options
+- "When management with a reputation for brilliance tackles a business with a reputation for bad economics, it is the reputation of the business that remains intact."
+- Companies with earnings that consistently exceed cash flow
+- Rising goodwill on the balance sheet without corresponding earnings growth

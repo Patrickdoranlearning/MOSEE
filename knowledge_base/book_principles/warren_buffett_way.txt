@@ -1,0 +1,144 @@
+THE WARREN BUFFETT WAY — Robert G. Hagstrom
+How Buffett Selects and Evaluates Investments
+
+=== THE TWELVE TENETS OF WARREN BUFFETT ===
+
+Hagstrom distilled Buffett's investment approach into 12 principles organized into four categories. Each can be assessed by carefully reading annual reports:
+
+--- BUSINESS TENETS ---
+
+1. IS THE BUSINESS SIMPLE AND UNDERSTANDABLE?
+   - Can you explain what the company does in one or two sentences?
+   - If the annual report is opaque, the business is probably too complex
+   - Buffett's best investments were businesses a child could understand: See's Candies (chocolate), Coca-Cola (beverages), GEICO (insurance)
+   - If the annual report requires an advanced degree to parse, it fails this test
+   - "Risk comes from not knowing what you're doing."
+
+2. DOES THE BUSINESS HAVE A CONSISTENT OPERATING HISTORY?
+   - Look for 10+ years of consistent financial performance
+   - Steady revenue growth, stable margins, predictable earnings
+   - Avoid businesses that are constantly reinventing themselves
+   - "I try to invest in businesses that are so wonderful that an idiot can run them. Because sooner or later, one will."
+   - In the annual report: Check the 5-10 year summary table for consistency
+
+3. DOES THE BUSINESS HAVE FAVORABLE LONG-TERM PROSPECTS?
+   - Is the industry growing or shrinking?
+   - Does the company have pricing power? Can it raise prices without losing customers?
+   - Will people still need this product/service in 10-20 years?
+   - In the annual report: Read the business description and competitive landscape sections
+   - Look for companies that are part of long-term secular trends, not fads
+
+--- MANAGEMENT TENETS ---
+
+4. IS MANAGEMENT RATIONAL?
+   - The most important management test: How do they allocate capital?
+   - When the business generates more cash than it can reinvest at high returns, does management:
+     a) Return cash to shareholders (dividends, buybacks)? GOOD
+     b) Make acquisitions in their area of expertise? POTENTIALLY GOOD
+     c) Diversify into unrelated businesses? BAD
+     d) Keep accumulating cash on the balance sheet earning low returns? MEDIOCRE
+   - In the annual report: Track how retained earnings are deployed year after year
+   - "The heads of many companies are not combating mediocrity. They are promoting it."
+
+5. IS MANAGEMENT CANDID WITH SHAREHOLDERS?
+   - Do they report the good AND the bad?
+   - Do they admit mistakes? Discuss challenges openly?
+   - Do they explain their capital allocation decisions?
+   - Compare what management said they would do last year with what actually happened
+   - Red flag: Management that only discusses positive developments
+   - Red flag: Blaming external factors for all poor performance
+   - "CEOs who claim that everything is wonderful are not being straight with you."
+
+6. DOES MANAGEMENT RESIST THE INSTITUTIONAL IMPERATIVE?
+   - Does management think independently, or follow the crowd?
+   - Signs of institutional imperative:
+     * Acquiring companies because competitors are acquiring
+     * Entering new markets because it's "trendy"
+     * Increasing spending because the budget allows it
+     * Hiring consultants to validate decisions already made
+   - In annual reports: Does the strategic direction make intrinsic sense, or is it following industry fashion?
+
+--- FINANCIAL TENETS ---
+
+7. FOCUS ON RETURN ON EQUITY, NOT EARNINGS PER SHARE
+   - EPS can be manipulated through share buybacks, accounting choices, and one-time items
+   - ROE measures how effectively management deploys shareholders' capital
+   - Look for ROE consistently above 15% without excessive leverage
+   - In the annual report: Calculate ROE from net income and average shareholders' equity
+   - Adjust for accounting distortions: add back unrealized gains/losses, normalize one-time items
+
+8. CALCULATE "OWNER EARNINGS"
+   - Owner Earnings = Net Income + Depreciation + Amortization - Capital Expenditures - Additional Working Capital
+   - This is the true cash flow available to owners
+   - More reliable than reported earnings because it adjusts for accounting artifice
+   - In the annual report: Derive from income statement and cash flow statement
+   - Track owner earnings trend over 5-10 years — should be growing
+
+9. LOOK FOR COMPANIES WITH HIGH PROFIT MARGINS
+   - High margins indicate competitive advantages (pricing power, efficiency, or both)
+   - Compare margins to industry peers — if the company has significantly higher margins, it has an advantage
+   - Margins should be stable or improving, not declining
+   - In the annual report: Track gross margin, operating margin, and net margin over time
+   - Declining margins often foreshadow declining competitive position
+
+10. FOR EVERY DOLLAR RETAINED, MAKE SURE THE COMPANY CREATES AT LEAST ONE DOLLAR OF MARKET VALUE
+    - The "$1 test": For every $1 of retained earnings, has the market value increased by at least $1?
+    - Calculate: Change in market cap over 5-10 years vs. total retained earnings over the same period
+    - If the company retains $1 billion but market value grows by only $500 million, management is destroying value
+    - In the annual report: Track retained earnings and compare to market cap growth
+
+--- VALUE TENETS ---
+
+11. DETERMINE THE VALUE OF THE BUSINESS
+    - Use owner earnings to calculate intrinsic value
+    - Discount future owner earnings to present value
+    - Use a conservative discount rate (Buffett uses the 10-year Treasury rate as minimum)
+    - Be conservative in growth projections — better to underestimate than overestimate
+    - "It's better to be approximately right than precisely wrong."
+    - Value should come from the annual report's financial data, not from market sentiment
+
+12. BUY AT A SIGNIFICANT DISCOUNT TO VALUE (MARGIN OF SAFETY)
+    - Only invest when price is significantly below your estimate of intrinsic value
+    - The wider the margin of safety, the less dependent you are on your forecasts being correct
+    - Buffett typically wants at least a 25-30% discount to intrinsic value
+    - "The three most important words in investing are margin of safety."
+
+=== BUFFETT'S FOCUS ON ECONOMIC GOODWILL ===
+
+Hagstrom explains Buffett's distinction between accounting goodwill and economic goodwill:
+
+ACCOUNTING GOODWILL: The premium paid for acquisitions above book value. Sits on the balance sheet.
+- Often meaningless — reflects what was paid, not what was received
+- Must be written down when value is impaired
+
+ECONOMIC GOODWILL: The intangible value that allows a company to earn above-average returns.
+- Brand reputation
+- Customer loyalty
+- Proprietary technology
+- Favorable location
+- Regulatory advantages
+
+In annual reports, look for evidence of economic goodwill:
+- Does the company earn high returns on tangible capital?
+- Can it raise prices without losing customers?
+- Is the competitive position strengthening over time?
+
+A company with high economic goodwill but low accounting goodwill is ideal.
+
+=== THE BUFFETT FOCUS PORTFOLIO ===
+
+Buffett concentrates his investments in a few high-conviction ideas:
+- "Wide diversification is only required when investors do not understand what they are doing."
+- When you find a company that passes all 12 tenets, invest heavily
+- Read the annual report thoroughly enough to know the business as well as management does
+- "You only need a few good ideas in a lifetime."
+
+=== TEMPERAMENT OVER INTELLECT ===
+
+"Investing is not a game where the guy with the 160 IQ beats the guy with the 130 IQ. Once you have ordinary intelligence, what you need is the temperament to control the urges that get other people into trouble in investing."
+
+When reading annual reports:
+- Be objective, not emotional
+- Don't let a previous investment decision color your analysis of new data
+- If the annual report shows deteriorating fundamentals, act on the data, not your hope
+- "The most important quality for an investor is temperament, not intellect."

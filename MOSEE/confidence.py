@@ -122,8 +122,20 @@ def calculate_data_quality_score(
         details["has_current_price"] = True
     else:
         details["has_current_price"] = False
-    
-    return min(score, max_score), details
+
+    # History depth penalty — projecting 10 years from <7 years of data
+    # is less reliable. Continuous penalty rather than a hard cutoff.
+    # Full score at 7+ years, linear ramp from 3 to 7.
+    IDEAL_YEARS = 7
+    years_available = 0
+    if cash_flow_df is not None and not cash_flow_df.empty:
+        years_available = len(cash_flow_df.columns) if hasattr(cash_flow_df, 'columns') else 0
+    if years_available < IDEAL_YEARS:
+        history_penalty = (IDEAL_YEARS - years_available) / IDEAL_YEARS * 15
+        score -= history_penalty
+        details["history_depth_penalty"] = round(history_penalty, 1)
+
+    return min(max(score, 0), max_score), details
 
 
 def calculate_metric_consistency_score(
@@ -162,16 +174,14 @@ def calculate_metric_consistency_score(
         details["methods_available"] = list(valuations.keys())
         return 30, details  # Low confidence if we can't compare
     
-    # Normalize valuations by market cap if available
-    if market_cap and market_cap > 0:
-        normalized = {k: v / market_cap for k, v in valuations.items()}
+    # Normalize valuations by their own median to make CV scale-independent.
+    # Using market cap creates scale-dependent results; median normalization
+    # measures agreement between methods regardless of absolute values.
+    median_val = np.median(list(valuations.values()))
+    if median_val != 0:
+        normalized = {k: v / median_val for k, v in valuations.items()}
     else:
-        # Use median for normalization
-        median_val = np.median(list(valuations.values()))
-        if median_val != 0:
-            normalized = {k: v / median_val for k, v in valuations.items()}
-        else:
-            normalized = valuations.copy()
+        normalized = valuations.copy()
     
     values = list(normalized.values())
     

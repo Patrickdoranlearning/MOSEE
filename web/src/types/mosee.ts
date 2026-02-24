@@ -1,17 +1,44 @@
 // MOSEE Stock Analysis Types
 
-export type Verdict = 
-  | 'STRONG BUY' 
-  | 'BUY' 
-  | 'ACCUMULATE' 
-  | 'HOLD' 
-  | 'WATCHLIST' 
-  | 'REDUCE' 
-  | 'SELL' 
-  | 'AVOID' 
+export type Verdict =
+  | 'STRONG BUY'
+  | 'BUY'
+  | 'ACCUMULATE'
+  | 'HOLD'
+  | 'WATCHLIST'
+  | 'REDUCE'
+  | 'SELL'
+  | 'AVOID'
   | 'INSUFFICIENT DATA'
 
 export type QualityGrade = 'A+' | 'A' | 'B' | 'C' | 'D' | 'F'
+
+// Lightweight stock summary for search and dashboard (no heavy JSON fields)
+export interface StockSummary {
+  id: string
+  ticker: string
+  company_name: string | null
+  industry: string | null
+  country: string | null
+  cap_size: string | null
+  current_price: number | null
+  market_cap: number | null
+  verdict: Verdict
+  quality_grade: QualityGrade | null
+  quality_score: number | null
+  margin_of_safety: number | null
+  has_margin_of_safety: boolean
+  buy_below_price: number | null
+  valuation_conservative: number | null
+  valuation_base: number | null
+  valuation_optimistic: number | null
+  pad_mosee: number | null
+  dcf_mosee: number | null
+  book_mosee: number | null
+  confidence_level: string | null
+  confidence_score: number | null
+  strengths: string[]
+}
 
 export interface Perspective {
   philosopher: string
@@ -66,6 +93,246 @@ export interface AnalysisRun {
   stocks_analyzed: number
   status: 'running' | 'completed' | 'failed'
   error_message: string | null
+  created_at: string
+}
+
+// Valuation Basis Data Types
+export interface YearByYearRow {
+  year: number
+  future_cash_flow?: number
+  projected_cash_flow?: number
+  future_cf?: number
+  discount_factor: number
+  present_value: number
+  cumulative_pv?: number
+}
+
+export interface ValuationBreakdown {
+  method: string
+  inputs: Record<string, number | string>
+  year_by_year: YearByYearRow[]
+  total_present_value: number
+}
+
+export interface BookValueBreakdown {
+  method: string
+  latest: {
+    total_assets: number
+    total_liabilities: number
+    book_value: number
+  }
+  historical: Array<{
+    year: number
+    total_assets: number
+    total_liabilities: number
+    book_value: number
+  }>
+}
+
+export interface YearlyDataPoint {
+  year: number
+  value: number
+}
+
+export interface FinancialStatements {
+  balance_sheet: {
+    total_assets: YearlyDataPoint[]
+    total_liabilities: YearlyDataPoint[]
+    stockholders_equity: YearlyDataPoint[]
+    total_debt: YearlyDataPoint[]
+    cash_on_hand: number
+    current_ratio: number
+  }
+  income_statement: {
+    revenue: YearlyDataPoint[]
+    gross_profit: YearlyDataPoint[]
+    ebit: YearlyDataPoint[]
+    net_income: YearlyDataPoint[]
+    gross_margin: YearlyDataPoint[]
+    operating_margin: YearlyDataPoint[]
+    net_margin: YearlyDataPoint[]
+  }
+  cash_flow: {
+    operating_cash_flow: YearlyDataPoint[]
+    capex: YearlyDataPoint[]
+    free_cash_flow: YearlyDataPoint[]
+    depreciation: YearlyDataPoint[]
+  }
+  owner_earnings: {
+    net_income: YearlyDataPoint[]
+    depreciation: YearlyDataPoint[]
+    capex: YearlyDataPoint[]
+    avg_capex: number
+    owners_earnings: YearlyDataPoint[]
+    formula: string
+  }
+}
+
+export interface ValuationRangeScenario {
+  cashflow_adj: string
+  growth_adj: string
+  discount_adj: string
+  year_by_year: Array<{
+    year: number
+    future_cf: number
+    discount_factor: number
+    present_value: number
+  }>
+  terminal_pv_per_share: number
+  value_per_share: number
+}
+
+export interface OwnerEarningsScenario {
+  owner_earnings: number
+  growth: string
+  required_return: string
+  value: number
+}
+
+export interface ValuationRangeDetail {
+  method: string
+  conservative: number
+  base: number
+  optimistic: number
+  confidence: string
+  assumptions: Record<string, unknown>
+}
+
+// Transparency types — verdict rationale, quality breakdown, confidence breakdown
+
+export interface VerdictGate {
+  gate: string
+  passed: boolean
+  detail: string
+}
+
+export interface VerdictRationale {
+  gates: VerdictGate[]
+  thresholds: Record<string, number>
+  summary: string
+}
+
+export interface QualityComponent {
+  name: string
+  score: number
+  weight: number
+  weighted_score: number
+  details: Record<string, string>
+}
+
+export interface QualityBreakdown {
+  ticker: string
+  total_score: number
+  grade: string
+  investment_style: string
+  components: QualityComponent[]
+  recommendation: string
+  strengths: string[]
+  weaknesses: string[]
+}
+
+export interface ConfidenceBreakdownData {
+  level: string
+  score: number
+  data_quality_score: number
+  metric_consistency_score: number
+  details: {
+    data_quality: Record<string, unknown>
+    metric_consistency: Record<string, unknown>
+  }
+}
+
+// Raw data types — for data transparency/auditing page
+
+export interface RawFinancialStatement {
+  line_items: Record<string, Record<string, number | null>>
+  years: string[]
+}
+
+export interface RawMarketData {
+  current_price: number | null
+  market_cap: number | null
+  shares_outstanding: number | null
+  stock_currency: string
+  reporting_currency: string
+  trading_to_usd_rate: number
+  reporting_to_usd_rate: number
+}
+
+export interface CurrencyInfo {
+  stock_currency: string
+  reporting_currency: string
+  trading_to_usd_rate: number
+  reporting_to_usd_rate: number
+  converted_to_usd: boolean
+}
+
+export interface StockRawData {
+  id: string
+  ticker: string
+  analysis_date: string
+  balance_sheet: RawFinancialStatement
+  income_statement: RawFinancialStatement
+  cash_flow: RawFinancialStatement
+  market_data: RawMarketData
+  currency_info: CurrencyInfo
+  created_at: string
+}
+
+// Stock preview data (lightweight yfinance fetch before full analysis)
+export interface StockPreview {
+  companyName: string
+  sector: string | null
+  industry: string | null
+  country: string | null
+  exchange: string | null
+  currency: string
+  currentPrice: number
+  previousClose: number | null
+  dayChange: number | null
+  dayChangePercent: number | null
+  marketCap: number
+  trailingPE: number | null
+  forwardPE: number | null
+  priceToBook: number | null
+  dividendYield: number | null
+  fiftyTwoWeekHigh: number | null
+  fiftyTwoWeekLow: number | null
+  averageVolume: number | null
+  beta: number | null
+}
+
+// Ticker suggestion from yfinance search (returned when a ticker is not found)
+export interface TickerSuggestion {
+  symbol: string
+  name: string
+  exchange: string | null
+  type: string | null
+}
+
+// AI Annual Report Analysis Types
+
+export interface AIDimension {
+  name: string
+  score: number
+  confidence: number
+  summary: string
+  evidence: string[]
+}
+
+export interface AIAnalysis {
+  id: string
+  ticker: string
+  analysis_date: string
+  filing_years: number[]
+  dimensions: AIDimension[]
+  executive_summary: string
+  key_findings: string[]
+  red_flags: string[]
+  competitive_advantages: string[]
+  management_assessment: string
+  composite_ai_score: number
+  model_used: string
   created_at: string
 }
 
@@ -129,6 +396,7 @@ export function formatPercent(value: number | null | undefined): string {
 // Helper to format MoS ratio
 export function formatMoS(value: number | null | undefined): string {
   if (value == null || !isFinite(value)) return 'N/A'
+  if (value < 0) return 'N/A (Neg. Value)'
   if (value > 10) return '>10x'
   return `${(value * 100).toFixed(0)}%`
 }

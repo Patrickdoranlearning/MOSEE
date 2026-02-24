@@ -494,8 +494,13 @@ def calculate_lynch_fair_value(
     """
     if eps <= 0:
         return 0.0
-    
+
     fair_pe = (growth_rate * 100) + (dividend_yield * 100)
+    # Sanity check: cap fair P/E at 40 to prevent unrealistic valuations
+    # Even exceptional growth companies rarely sustain P/E > 40 long-term
+    fair_pe = min(fair_pe, 40)
+    # Floor at 0 to prevent negative fair values from negative growth
+    fair_pe = max(fair_pe, 0)
     return eps * fair_pe
 
 

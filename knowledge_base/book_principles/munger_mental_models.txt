@@ -1,0 +1,113 @@
+CHARLIE MUNGER'S MENTAL MODELS AND INVESTMENT WISDOM
+From Poor Charlie's Almanack, speeches, and Berkshire meetings
+
+=== THE PSYCHOLOGY OF HUMAN MISJUDGMENT ===
+
+Munger identified cognitive biases that cause investors and managers to make poor decisions. When reading annual reports, watch for these biases in management behavior:
+
+1. INCENTIVE-CAUSED BIAS: "Show me the incentive and I will show you the outcome."
+   - How is management compensated? If bonuses are tied to revenue growth, expect acquisitions. If tied to EPS, expect buybacks and accounting tricks.
+   - Read the proxy statement / compensation section carefully.
+   - Are incentives aligned with long-term shareholder value?
+
+2. COMMITMENT AND CONSISTENCY BIAS: Once management commits to a strategy publicly, they'll stick with it even when evidence says it's failing.
+   - Compare strategic direction described in annual reports over multiple years
+   - Are they doubling down on failed strategies?
+   - Do they pivot when facts change, or ride losing bets?
+
+3. SOCIAL PROOF: Management imitating competitors rather than thinking independently.
+   - "Whenever you hear the phrase 'the industry standard practice,' be skeptical."
+   - Are acquisitions driven by competitive pressure rather than value creation?
+
+4. DEPRIVAL SUPER-REACTION: Companies often make terrible decisions to avoid losing something.
+   - Overpaying to retain market share
+   - Destroying value to prevent competitors from gaining ground
+
+5. LOLLAPALOOZA EFFECTS: Multiple biases combining to create extreme outcomes.
+   - The most dangerous situations are when several biases reinforce each other
+
+=== INVERSION ===
+
+"Invert, always invert." Munger's most powerful mental model.
+
+Instead of asking "What makes this a good investment?", ask:
+- What could destroy this business?
+- What could go wrong?
+- Why might this investment fail?
+- What would make me sell?
+
+When reading annual reports, deliberately look for:
+- The risks that could kill the business
+- The weaknesses management is not discussing
+- The ways the competitive position could erode
+- The scenarios where the debt becomes unserviceable
+
+=== MUNGER ON MOATS ===
+
+"How do you compete against a true fanatic? You can only try to build the best moat you can around your own business."
+
+Types of moats Munger valued:
+1. BRAND: "Coca-Cola's moat is in the mind of the consumer."
+2. SCALE: "Being the low-cost producer in a commodity business is like having a license to steal."
+3. SWITCHING COSTS: "If it costs the customer more to switch than to stay, you have a moat."
+4. NETWORK EFFECTS: "A telephone system becomes more valuable as more people join it."
+5. REGULATORY: "Some of the best businesses have regulatory protection."
+
+=== MUNGER ON MANAGEMENT ===
+
+"The best thing a human being can do is to help another human being know more."
+
+What Munger looked for in management:
+- RATIONALITY above all: "The most important quality in a manager is rationality, not brilliance."
+- CANDOR: Do they admit mistakes? "I like people who admit their mistakes. It shows they know more than when they started."
+- CAPITAL ALLOCATION SKILL: "If a management can't allocate capital well, even the best business will suffer."
+- SKIN IN THE GAME: Managers should be significant shareholders.
+- SIMPLICITY: Good managers keep things simple. Complexity is often a warning sign.
+
+=== MUNGER ON ACCOUNTING ===
+
+"People who know nothing about accounting have no business investing."
+
+Red flags Munger watched for:
+- EBITDA obsession: "Every time you hear EBITDA, substitute 'bullshit earnings.'"
+- Pro-forma adjustments that always make earnings look better
+- Pension fund assumptions that are unrealistically optimistic
+- Goodwill that never gets written down despite poor acquisition performance
+- Companies where reported earnings consistently exceed cash flow
+- "Three of the worst words in investing are 'special charges expected.'"
+
+=== MUNGER'S INVESTMENT CHECKLIST ===
+
+Before investing, Munger required:
+1. A business he understood ("We have three baskets: in, out, and too hard")
+2. Intrinsic competitive advantages with durability
+3. Able and trustworthy management
+4. Available at a price that makes sense (margin of safety)
+5. A business that can reinvest at high rates of return
+
+=== MUNGER ON WHAT MAKES A GREAT BUSINESS ===
+
+"A great business at a fair price is superior to a fair business at a great price."
+
+Characteristics of a great business from annual reports:
+- High returns on capital WITHOUT leverage
+- Ability to raise prices without losing customers
+- Minimal capital requirements for growth
+- Earnings that are highly predictable
+- Protected from competition by durable advantages
+- Management that is rational about capital allocation
+
+=== MULTIDISCIPLINARY THINKING ===
+
+Munger advocated using multiple mental models from different disciplines:
+- Economics: Supply and demand, competitive destruction, scale advantages
+- Psychology: Behavioral biases, incentives, social proof
+- Mathematics: Compound interest, probability, statistics
+- Engineering: Redundancy, backup systems, margin of safety
+- Biology: Evolution, adaptation, ecosystem thinking
+
+When analyzing an annual report, don't just think like an accountant. Think about:
+- The competitive ecosystem (biology)
+- The management incentives (psychology)
+- The probability of different outcomes (mathematics)
+- The economic moat (economics)

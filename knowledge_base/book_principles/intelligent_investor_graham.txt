@@ -1,0 +1,77 @@
+THE INTELLIGENT INVESTOR — Benjamin Graham
+Key Principles for Analyzing Companies
+
+=== GRAHAM'S 7 DEFENSIVE CRITERIA ===
+
+When evaluating a company's annual report, check these seven criteria that Graham considered essential for a defensive (conservative) investor:
+
+1. ADEQUATE SIZE: The company should have annual revenues of at least $500 million (inflation-adjusted). Small companies are more vulnerable to economic shocks. In the annual report, look at the revenue figure and multi-year revenue trajectory.
+
+2. STRONG FINANCIAL CONDITION: Current assets should be at least twice current liabilities (current ratio >= 2.0). For industrials, long-term debt should not exceed working capital. In the balance sheet section, compute these ratios and look for trends. If the company is taking on more debt each year, that's concerning.
+
+3. EARNINGS STABILITY: The company should have reported positive earnings in each of the past 10 years. Look at the income statement history. Any year of losses is a red flag for defensive investors. Cyclical businesses that show losses during downturns are riskier.
+
+4. DIVIDEND RECORD: Uninterrupted dividends for at least the past 20 years. Check the cash flow statement and shareholder return sections. A long dividend history shows discipline and real cash generation.
+
+5. EARNINGS GROWTH: A minimum increase of at least one-third in per-share earnings over the past 10 years, using three-year averages at the beginning and end. Look at the EPS history in the annual report. Stagnant earnings over a decade suggest the business lacks competitive advantages.
+
+6. MODERATE P/E RATIO: The current price should not be more than 15 times average earnings of the past three years. Compare the stock price to the average of the last 3 years of earnings.
+
+7. MODERATE PRICE-TO-BOOK: The current price should not be more than 1.5 times book value. The product of P/E and P/B should not exceed 22.5 (that is, 15 x 1.5). Check the balance sheet for book value per share.
+
+=== MARGIN OF SAFETY ===
+
+Graham's most important concept: "The margin of safety is always dependent on the price paid." Never buy a stock at full value. Always demand a discount to your estimate of intrinsic value.
+
+When reading an annual report, the margin of safety comes from:
+- Buying below book value (the assets backing the stock)
+- Buying at a P/E well below the market average when the company's earnings are stable
+- Buying companies with earnings power significantly above bond yields
+- The company having significantly more assets than debt
+
+"The purpose of the margin of safety is to render unnecessary an accurate estimate of the future."
+
+=== MR. MARKET ===
+
+Graham taught that the stock market is like a manic-depressive business partner named Mr. Market who offers to buy or sell shares at different prices every day. Sometimes he is euphoric and offers high prices. Sometimes he is depressed and offers bargain prices.
+
+When reading an annual report, ask: Is the current stock price reflecting Mr. Market's euphoria or depression? The annual report tells you about the BUSINESS. The stock price tells you about SENTIMENT. They are different things.
+
+=== WHAT TO LOOK FOR IN ANNUAL REPORTS ===
+
+Graham specifically advised investors to read annual reports looking for:
+
+1. ACCOUNTING CHANGES: Has the company changed its accounting methods? Depreciation schedules? Revenue recognition? These changes often mask deteriorating fundamentals.
+
+2. FOOTNOTES: "The footnotes to financial statements are where companies bury the bodies." Read them carefully for:
+   - Off-balance-sheet obligations
+   - Related party transactions
+   - Contingent liabilities
+   - Changes in assumptions
+
+3. MANAGEMENT CANDOR: Does management honestly discuss failures and challenges, or only highlight successes? "You can judge the quality of management by how forthright they are in their annual report."
+
+4. EARNINGS QUALITY: Are earnings from operations or from one-time events? Look for:
+   - Recurring vs non-recurring income
+   - Cash flow vs accounting earnings
+   - Sustainable revenue sources
+
+5. BALANCE SHEET STRENGTH: Graham prioritized the balance sheet over the income statement because it's harder to manipulate. Look for:
+   - Growing cash and equivalents
+   - Declining debt
+   - Increasing tangible book value
+   - No goodwill writedowns (which signal overpaid acquisitions)
+
+=== GRAHAM'S WARNINGS ===
+
+"The investor's chief problem — and his worst enemy — is likely to be himself."
+
+Red flags in annual reports:
+- Aggressive revenue recognition (booking revenue before cash is received)
+- Capitalizing expenses that should be expensed (artificially inflating earnings)
+- Frequent "non-recurring" charges that somehow recur every year
+- Pro-forma or adjusted earnings that are always much higher than GAAP earnings
+- Excessive stock-based compensation diluting shareholders
+- Management compensation that isn't tied to shareholder returns
+- Debt growing faster than earnings
+- Acquisitions growing faster than organic revenue

@@ -1,0 +1,163 @@
+POOR CHARLIE'S ALMANACK — Charlie Munger
+The Wit and Wisdom of Charles T. Munger
+
+=== THE LATTICEWORK OF MENTAL MODELS ===
+
+Munger's central thesis: You need multiple mental models from multiple disciplines to make good decisions. Relying on one framework leads to the "man with a hammer" syndrome — "To a man with only a hammer, every problem looks like a nail."
+
+Essential mental models for analyzing annual reports:
+
+1. ENGINEERING — REDUNDANCY & BACKUP SYSTEMS:
+   - Does the company have backup systems? Multiple revenue streams? Diversified customers?
+   - A business dependent on a single product, customer, or geography has no redundancy
+   - "Engineering systems have multiple backups. The best businesses do too."
+
+2. MATHEMATICS — COMPOUND INTEREST:
+   - "Understanding both the power of compound interest and the difficulty of getting it is the heart and soul of understanding a lot of things."
+   - Look for businesses that can reinvest earnings at high rates of return
+   - A company earning 20% ROE that retains all earnings doubles in value every 3.6 years
+   - The eighth wonder of the world, but only if the business can maintain those returns
+
+3. MATHEMATICS — PROBABILITY & DECISION TREES:
+   - Don't think about the most likely outcome. Think about ALL possible outcomes weighted by probability.
+   - Expected value = Sum of (probability × outcome) for all scenarios
+   - When reading annual reports, map out bull case, base case, and bear case scenarios
+
+4. PSYCHOLOGY — INCENTIVE STRUCTURES:
+   - "Never, ever, think about something else when you should be thinking about the power of incentives."
+   - Management compensation structure determines behavior
+   - If the CEO gets bonuses for revenue growth, expect acquisitions regardless of value
+   - If stock options vest regardless of performance, expect dilution
+
+5. BIOLOGY — EVOLUTION & ADAPTATION:
+   - Businesses must adapt or die, just like organisms
+   - Look for companies that are evolving: investing in R&D, entering new markets, adapting to technology
+   - Companies clinging to legacy business models in changing industries are the corporate equivalent of dinosaurs
+
+6. PHYSICS — CRITICAL MASS:
+   - Some businesses need to reach critical mass before they become self-sustaining
+   - Network effects: Each new user makes the network more valuable for all users
+   - Platform businesses often exhibit winner-take-most dynamics
+
+7. ECONOMICS — COMPETITIVE DESTRUCTION:
+   - "In capitalism, it's a lot like a chess game. You have to be in a position where you can't be easily taken."
+   - Study the five forces: rivalry, new entrants, substitutes, supplier power, buyer power
+   - Annual reports reveal which forces are intensifying and which are weakening
+
+=== THE PSYCHOLOGY OF HUMAN MISJUDGMENT — FULL FRAMEWORK ===
+
+Munger identified 25 cognitive biases. The most relevant for analyzing annual reports:
+
+1. REWARD AND PUNISHMENT SUPER-RESPONSE:
+   - People respond to incentives, often unconsciously
+   - In annual reports: How is management paid? Short-term bonuses create short-term thinking
+   - "Show me the incentive and I will show you the outcome."
+
+2. LIKING/LOVING TENDENCY:
+   - We tend to ignore faults in things/people we like
+   - Investors fall in love with stocks and ignore deteriorating fundamentals
+   - When reading annual reports of companies you own, actively look for negatives
+
+3. DISLIKING/HATING TENDENCY:
+   - We tend to ignore virtues in things/people we dislike
+   - Don't dismiss a company because of one bad quarter or an unlikable CEO
+   - Read the numbers, not the narrative
+
+4. DOUBT-AVOIDANCE TENDENCY:
+   - People rush to remove doubt by making quick decisions
+   - Don't rush to a conclusion after reading one annual report
+   - Read multiple years. Read competitors. Take your time.
+
+5. INCONSISTENCY-AVOIDANCE TENDENCY:
+   - Once we form a view, we resist changing it
+   - If you bought a stock at $100 and it's now $50, re-read the annual report as if you didn't own it
+   - "The human mind is a lot like the human egg. When one idea gets in, it shuts the gate."
+
+6. OVER-OPTIMISM TENDENCY:
+   - Management's MD&A section is almost always overly optimistic
+   - Discount management projections by 20-30%
+   - Look for concrete data, not aspirational statements
+
+7. SOCIAL-PROOF TENDENCY:
+   - "Monkey see, monkey do." Companies imitate competitors.
+   - When every company in an industry is doing the same thing (expanding, buying back stock, acquiring), be skeptical
+   - The best companies think independently
+
+8. AUTHORITY-MISINFLUENCE TENDENCY:
+   - Don't blindly trust management because they're executives
+   - Verify their claims against the numbers
+   - "Trust, but verify."
+
+9. TWADDLE TENDENCY:
+   - People talk and write more than they should
+   - Annual reports filled with buzzwords and jargon ("synergies," "best-in-class," "transformational") are often covering up a lack of substance
+   - "If you can't explain it simply, you don't understand it well enough."
+
+10. DEPRIVAL SUPER-REACTION:
+    - People react more strongly to losing something than to gaining it
+    - Companies will destroy value to protect market share they're losing
+    - Watch for irrational price wars or overpaying to keep customers
+
+=== MUNGER'S INVESTMENT PRINCIPLES ===
+
+"All I want to know is where I'm going to die, so I'll never go there."
+
+INVERSION APPLIED TO ANNUAL REPORTS:
+Instead of asking "Is this a good investment?", ask:
+- What would make this a terrible investment?
+- How could I lose all my money here?
+- What am I missing that the market might know?
+- What assumptions am I making that could be wrong?
+
+THE FOUR FILTERS (Munger's version):
+1. Do I understand this business? (If the annual report confuses you, pass)
+2. Does it have a sustainable competitive advantage? (Moats)
+3. Is management trustworthy and talented? (Integrity + competence)
+4. Is the price reasonable? (Margin of safety)
+
+"We have to deal in things we're capable of understanding, and then once we're in that territory, we need to buy the strongest stuff we can find."
+
+=== MUNGER ON WORLDLY WISDOM ===
+
+"You've got to have models in your head. And you've got to array your experience — both vicarious and direct — on this latticework of models."
+
+Key principles for annual report analysis:
+
+CIRCLE OF COMPETENCE:
+- Only analyze businesses you truly understand
+- "Knowing what you don't know is more useful than being brilliant."
+- If you can't explain how the company makes money after reading the annual report, move on
+
+THE LOLLAPALOOZA EFFECT:
+- When multiple mental models point in the same direction, the effect is multiplicative, not additive
+- A company with great management + strong moat + growing market + low valuation = lollapalooza
+- Conversely, bad management + deteriorating moat + shrinking market + high valuation = disaster
+
+PATIENCE:
+- "The big money is not in the buying and the selling, but in the waiting."
+- Don't feel compelled to act after reading every annual report
+- The best opportunities require patience: waiting for quality at a fair price
+
+=== MUNGER ON CORPORATE GOVERNANCE ===
+
+What to look for in annual reports regarding governance:
+
+1. BOARD INDEPENDENCE: Are directors truly independent or cronies of the CEO?
+2. COMPENSATION FAIRNESS: Is the CEO paid like an owner or like a king?
+3. CAPITAL ALLOCATION: Is the board rubber-stamping management decisions?
+4. SHAREHOLDER ALIGNMENT: Do directors own meaningful amounts of stock?
+5. TRANSPARENCY: Does the company voluntarily disclose more than required?
+
+"A lot of people think that if you just get governance right, everything follows. That's not true. You need to get the culture right."
+
+=== MUNGER'S CHECKLIST FOR AVOIDING MISTAKES ===
+
+Before investing, check each item:
+- Have I accounted for all relevant facts?
+- Have I thought about this from the other side (inversion)?
+- Am I being influenced by social proof?
+- Am I anchored to a previous price or opinion?
+- Am I overweighting recent events?
+- Have I considered the full range of outcomes, not just the most likely?
+- Is my reasoning sound, or am I rationalizing a decision I've already made?
+- Would I be comfortable if this investment were made public?

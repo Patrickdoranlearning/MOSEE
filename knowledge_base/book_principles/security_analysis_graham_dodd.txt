@@ -1,0 +1,129 @@
+SECURITY ANALYSIS — Benjamin Graham & David Dodd
+Key Principles for Analyzing Annual Reports
+
+=== THE FOUNDATION OF FUNDAMENTAL ANALYSIS ===
+
+Security Analysis is the foundational text for analyzing financial statements. Graham and Dodd taught that the annual report is the primary tool for determining intrinsic value.
+
+"The analyst's job is to determine what a security is worth, not what it will sell for."
+
+=== EARNINGS ANALYSIS ===
+
+Graham and Dodd distinguished between different types of earnings:
+
+1. REPORTED EARNINGS: What the income statement shows. Often unreliable because of accounting choices.
+
+2. REAL EARNINGS: The actual economic earning power after adjustments:
+   - Remove non-recurring gains and losses
+   - Normalize for the business cycle (use 7-10 year averages)
+   - Adjust for accounting method changes
+   - Deduct stock-based compensation at fair value
+   - Include maintenance capex as a real expense
+
+3. EARNING POWER: The sustainable, normalized earnings the business can produce in average conditions.
+   - "Earning power is a concept of the past applied to the future."
+   - Use average earnings, not peak or trough earnings
+   - For cyclical businesses, earning power should be based on mid-cycle results
+
+=== BALANCE SHEET ANALYSIS ===
+
+"The balance sheet deserves more attention than it usually gets."
+
+Key Graham & Dodd balance sheet techniques for annual reports:
+
+1. NET CURRENT ASSET VALUE (NCAV):
+   - NCAV = Current Assets - ALL Liabilities (not just current)
+   - If stock trades below NCAV, you're getting the business for less than its liquidation value
+   - This provides extreme margin of safety
+
+2. TANGIBLE BOOK VALUE:
+   - Book Value - Intangible Assets (goodwill, patents, etc.)
+   - Intangibles should be viewed skeptically: "Goodwill has value only if the business generates excess returns"
+   - Companies trading below tangible book value deserve investigation
+
+3. WORKING CAPITAL TRENDS:
+   - Is working capital growing in line with revenue?
+   - Rapid growth in receivables may signal aggressive revenue recognition
+   - Rapid growth in inventory may signal demand problems
+   - Declining working capital may signal cash flow issues
+
+4. HIDDEN ASSETS AND LIABILITIES:
+   - Real estate carried at historical cost (may be worth far more)
+   - LIFO inventory reserves (understates true inventory value)
+   - Pension obligations (may be underfunded)
+   - Operating lease obligations (effectively debt)
+   - Environmental liabilities
+   - Lawsuit contingencies
+
+=== INCOME STATEMENT ANALYSIS ===
+
+"The income statement is more subject to manipulation than the balance sheet."
+
+What to examine in annual reports:
+
+1. REVENUE QUALITY:
+   - Is revenue growing organically or through acquisitions?
+   - Revenue recognition: When does the company book revenue? Upfront or over time?
+   - Are there unusual revenue items that inflate the top line?
+   - Recurring vs. non-recurring revenue
+
+2. EXPENSE ANALYSIS:
+   - Depreciation: Is the depreciation policy realistic? Compare to capex.
+   - If depreciation << capex, the company may be under-depreciating
+   - SG&A as a percentage of revenue: Is it growing or shrinking?
+   - Are there "restructuring charges" every year? Then they're not really restructuring charges.
+
+3. MARGIN ANALYSIS:
+   - Gross margin: Measures pricing power and production efficiency
+   - Operating margin: Includes the cost of running the business
+   - Net margin: After all costs, taxes, and interest
+   - Trend matters more than absolute level
+
+=== CASH FLOW ANALYSIS ===
+
+Graham and Dodd emphasized cash over earnings:
+
+"In the long run, a company's value is determined by its cash flows, not its reported earnings."
+
+1. OPERATING CASH FLOW vs NET INCOME:
+   - If net income consistently exceeds operating cash flow, earnings quality is suspect
+   - Cash flow is harder to manipulate than earnings
+   - "Cash flow is the reality check on reported earnings."
+
+2. FREE CASH FLOW:
+   - FCF = Operating Cash Flow - Capital Expenditures
+   - A company that can't generate free cash flow is consuming capital, not creating it
+   - Free cash flow funds dividends, buybacks, debt repayment, and acquisitions
+
+3. CAPITAL EXPENDITURE ANALYSIS:
+   - Maintenance capex vs. growth capex
+   - If capex consistently exceeds depreciation, the company may be under-depreciating
+   - Capital-intensive businesses require more reinvestment, leaving less for shareholders
+
+=== COMPARATIVE ANALYSIS ===
+
+"No company should be analyzed in isolation."
+
+Graham and Dodd advocated comparing:
+- The company's metrics to industry peers
+- The company's current metrics to its own history
+- The company's management claims to actual results
+
+In annual reports, compare:
+- Margins to competitors (disclosed in industry analysis)
+- Growth rates to industry averages
+- Return on capital to peers
+- Debt levels to peers
+- This year's promises to last year's delivery
+
+=== GRAHAM & DODD'S WARNINGS ===
+
+Red flags when reading annual reports:
+
+- EARNINGS MANAGEMENT: Companies that consistently report earnings just above analyst estimates
+- CHANNEL STUFFING: Pushing product to distributors to inflate revenue (shows up as inventory buildup at customers or accelerating receivables)
+- COOKIE JAR RESERVES: Taking large write-offs in bad years, then releasing reserves in good years to smooth earnings
+- PRO FORMA EARNINGS: Non-GAAP measures that exclude real, recurring expenses
+- ACQUISITION ACCOUNTING: Using acquisition reserves to inflate future earnings
+- PENSION MANIPULATION: Using unrealistic return assumptions to reduce pension expense
+- "Accounting quality is as important as business quality."

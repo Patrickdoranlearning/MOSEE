@@ -9,6 +9,16 @@ interface StockCardProps {
   stock: StockAnalysis
 }
 
+// Helper to get color based on MOSEE score quality
+function getMoseeColor(score: number | null | undefined): string {
+  if (score == null || !isFinite(score)) return 'text-gray-400'
+  if (score >= 0.15) return 'text-green-600'
+  if (score >= 0.10) return 'text-emerald-600'
+  if (score >= 0.05) return 'text-yellow-600'
+  if (score > 0) return 'text-orange-500'
+  return 'text-red-500'
+}
+
 export function StockCard({ stock }: StockCardProps) {
   return (
     <Link href={`/stock/${stock.ticker}`}>
@@ -27,6 +37,16 @@ export function StockCard({ stock }: StockCardProps) {
           <VerdictBadge verdict={stock.verdict} size="sm" />
         </div>
         
+        {/* MOSEE Score - Key One-Look Metric */}
+        <div className="mb-3 p-2 rounded-lg bg-gray-50">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500 uppercase tracking-wide">MOSEE Score</span>
+            <span className={`text-lg font-bold ${getMoseeColor(stock.pad_mosee)}`}>
+              {stock.pad_mosee != null ? stock.pad_mosee.toFixed(3) : 'N/A'}
+            </span>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
             <p className="text-gray-500">Price</p>

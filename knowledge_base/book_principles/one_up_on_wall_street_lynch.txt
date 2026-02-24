@@ -1,0 +1,125 @@
+ONE UP ON WALL STREET — Peter Lynch
+Key Principles for Analyzing Companies
+
+=== LYNCH'S SIX CATEGORIES OF STOCKS ===
+
+Lynch classified every stock into one of six categories. When reading annual reports, first determine which category the company belongs to, because each category has different evaluation criteria:
+
+1. SLOW GROWERS (Sluggards): Large, mature companies growing slightly faster than GDP (2-4%).
+   - Expected in mature industries
+   - Valued for dividends, not growth
+   - In annual reports: Look for steady dividends, stable but unexciting revenue
+   - Red flag: Management talking about "exciting growth opportunities" in a clearly mature business
+
+2. STALWARTS: Large companies with moderate growth (10-12%). Think Coca-Cola, Procter & Gamble.
+   - Good protection in recessions
+   - In annual reports: Look for consistent earnings growth, expanding margins, global expansion
+   - Buy when P/E is below growth rate; sell when P/E significantly exceeds growth rate
+
+3. FAST GROWERS: Small, aggressive companies growing 20-25% per year.
+   - The most rewarding category
+   - In annual reports: Look for rapid revenue growth, improving margins, expanding into new markets
+   - Red flag: Growth funded entirely by debt, or growth slowing while management denies it
+   - "The key question: How long can the company keep growing, and how much has the market already paid for that growth?"
+
+4. CYCLICALS: Companies whose sales and profits rise and fall in regular patterns (autos, airlines, steel, chemicals).
+   - Timing is everything
+   - In annual reports: Look at where they are in the cycle. Low earnings and low P/E = buy. High earnings and low P/E = SELL.
+   - "With cyclicals, you buy them when the P/E ratio is high (earnings depressed) and sell when the P/E is low (earnings at peak)."
+
+5. TURNAROUNDS: Companies recovering from disaster.
+   - In annual reports: Look for debt reduction, cost cutting, asset sales, new management
+   - "The best turnarounds are the ones with the least debt."
+   - How much cash do they have? Can they survive long enough to recover?
+
+6. ASSET PLAYS: Companies sitting on valuable assets the market hasn't noticed.
+   - In annual reports: Look at the balance sheet for undervalued real estate, natural resources, brand value, patents
+   - "The assets can be anything from cash and real estate to brand names and patents."
+
+=== THE PEG RATIO ===
+
+Lynch's signature metric:
+
+PEG Ratio = P/E Ratio / Earnings Growth Rate
+
+- PEG < 1.0: Stock is undervalued relative to its growth
+- PEG = 1.0: Fairly valued
+- PEG > 1.5: Getting expensive
+- PEG > 2.0: Usually overvalued
+
+In annual reports, estimate the sustainable earnings growth rate by:
+- Looking at the historical EPS growth rate (5-10 years)
+- Checking if growth is accelerating or decelerating
+- Assessing whether growth is organic or acquisition-driven
+- Comparing to management's own guidance
+
+=== LYNCH'S 2-MINUTE DRILL ===
+
+Lynch could quickly assess any company by answering these questions from the annual report:
+
+1. What's the company's story? Can you explain it in a simple sentence?
+2. Is revenue growing? How fast?
+3. Is EPS growing? How fast?
+4. What's the P/E relative to growth rate?
+5. Is the balance sheet strong (cash > debt)?
+6. Are insiders buying?
+7. Is the company buying back shares?
+
+=== WHAT LYNCH LOOKED FOR IN ANNUAL REPORTS ===
+
+1. CASH POSITION: "Cash is King. If a company has a lot of cash per share relative to its stock price, that's very bullish."
+   - Net cash = Cash - Total Debt
+   - Net cash per share relative to stock price
+   - Is cash growing or shrinking?
+
+2. DEBT LEVELS: Lynch preferred companies with low debt.
+   - Debt-to-equity ratio
+   - Interest coverage
+   - "In a recession, companies with a lot of debt get killed."
+
+3. INVENTORY: Especially for manufacturers and retailers.
+   - Is inventory growing faster than sales? (Bad sign — they can't sell what they make)
+   - Is inventory declining relative to sales? (Good sign — products are selling well)
+
+4. EARNINGS GROWTH CONSISTENCY: "One year of great earnings followed by a year of terrible earnings is not as valuable as steady, consistent growth."
+
+5. PROFIT MARGINS: Are they expanding, stable, or contracting?
+   - Expanding margins + growing revenue = the sweet spot
+   - Contracting margins are an early warning sign
+
+=== LYNCH'S RED FLAGS ===
+
+- Hot stocks in hot industries: "If I could avoid a single stock, it would be the hottest stock in the hottest industry."
+- Companies that diversify through acquisitions: "Diworsification"
+- Companies dependent on a single customer or product
+- "Whisper stocks" with exciting stories but no earnings
+- Companies where the stock price has gotten way ahead of fundamentals
+- Excessive hype in the annual report without substance
+- Companies spending more time on investor relations than on their actual business
+
+=== LYNCH ON THE IDEAL COMPANY ===
+
+The perfect Lynch investment has these characteristics visible in annual reports:
+1. The name is boring or sounds ridiculous
+2. The business is boring or disagreeable
+3. It's a spinoff
+4. Institutions don't own it
+5. There's something depressing about it
+6. The industry is no-growth
+7. It has a niche
+8. People have to keep buying (razor blades, not one-time purchases)
+9. It's a user of technology, not a maker
+10. Insiders are buying
+11. The company is buying back shares
+12. It has a strong cash position
+
+=== LYNCH ON EARNINGS ===
+
+"In the end, the earnings will determine the stock price."
+
+When assessing earnings from annual reports:
+- Look at the 5-10 year earnings trend line
+- Ask: Are earnings growing because of real business improvement or accounting tricks?
+- Compare earnings growth to revenue growth — if earnings grow much faster than revenue, it may not be sustainable
+- Check the tax rate — a one-time tax benefit can inflate earnings temporarily
+- "The p/e ratio of any company that is fairly priced will equal its growth rate."

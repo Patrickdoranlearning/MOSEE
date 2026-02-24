@@ -31,5 +31,11 @@ multitasking>=0.0.11
 # Utilities
 python-dotenv>=1.0.0  # For loading environment variables
 
+# AI Analysis (annual report analysis with Gemini)
+google-generativeai>=0.8.0  # Gemini API client
+chromadb>=0.5.0             # Local vector database for RAG knowledge base
+sentence-transformers>=3.0.0  # Embedding model (all-MiniLM-L6-v2)
+edgartools>=3.0.0           # SEC EDGAR filing fetcher with section extraction
+
 # Optional: for local development/testing
 rich>=13.0.0  # Pretty console output for debugging

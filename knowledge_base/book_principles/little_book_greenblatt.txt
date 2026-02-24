@@ -1,0 +1,100 @@
+THE LITTLE BOOK THAT BEATS THE MARKET — Joel Greenblatt
+Key Principles for Analyzing Companies
+
+=== THE MAGIC FORMULA ===
+
+Greenblatt's Magic Formula ranks stocks on two factors, combining quality with value:
+
+1. EARNINGS YIELD = EBIT / Enterprise Value
+   - Measures how cheap the business is
+   - Uses EBIT (not net income) to compare companies regardless of capital structure
+   - Uses Enterprise Value (market cap + debt - cash) to account for leverage
+   - Higher is better: you're getting more earnings per dollar invested
+   - In annual reports: Find EBIT on the income statement, compute EV from balance sheet + market price
+
+2. RETURN ON CAPITAL = EBIT / (Net Fixed Assets + Net Working Capital)
+   - Measures how good the business is at deploying capital
+   - Higher is better: the business generates more profit per dollar of capital employed
+   - In annual reports: Find net fixed assets and net working capital on the balance sheet
+   - Consistently high ROC suggests durable competitive advantages
+
+The Magic Formula ranks stocks by both metrics and buys those that rank highest on both (cheap AND good).
+
+=== WHY THE MAGIC FORMULA WORKS ===
+
+"Buying good businesses at bargain prices is the secret to making lots of money."
+
+The formula works because:
+- HIGH EARNINGS YIELD means you're buying cheap relative to the business's earning power
+- HIGH RETURN ON CAPITAL means you're buying a genuinely good business
+- Together, they identify quality businesses temporarily available at discount prices
+
+=== GREENBLATT ON WHAT MAKES A GOOD BUSINESS ===
+
+"A good business is one that earns a high return on its capital."
+
+In annual reports, look for:
+- ROIC consistently above 20% over many years
+- This indicates competitive advantages (moats) — a business without advantages can't sustain high returns because competition would erode them
+- "If a business earns 25% on capital, and you can reinvest in the business at those rates, you have a compounding machine."
+
+Why return on capital matters more than growth:
+- A business growing at 15% but earning 5% on capital is destroying value
+- A business growing at 5% but earning 25% on capital is creating enormous value
+- "Growth is great, but only if the business can grow while maintaining high returns on capital."
+
+=== GREENBLATT ON ENTERPRISE VALUE ===
+
+"Looking at a company's earnings yield based on enterprise value gives a clearer picture than P/E ratio."
+
+Why EV-based metrics are superior (found in annual reports):
+- P/E ignores debt: A company with $10B market cap and $20B debt is NOT cheaper than one with $10B market cap and no debt
+- Enterprise Value = Market Cap + Debt - Cash
+- EBIT/EV compares companies on a capital-structure-neutral basis
+- This prevents the trap of buying highly leveraged companies that LOOK cheap on P/E
+
+=== GREENBLATT ON SPECIAL SITUATIONS ===
+
+Greenblatt also wrote "You Can Be a Stock Market Genius" focusing on special situations visible in annual reports:
+
+1. SPIN-OFFS: When a company spins off a division, the spin-off is often mispriced.
+   - Institutional investors often dump the spin-off because it's too small or doesn't fit their mandate
+   - Read the prospectus/annual report of the new entity carefully
+   - "Spin-offs, on average, outperform the market by about 10% per year in their first three years."
+
+2. RECAPITALIZATIONS: When companies restructure their balance sheet.
+   - Look for companies distributing excess cash while maintaining strong operations
+
+3. MERGER SECURITIES: The securities received in mergers are often sold indiscriminately.
+
+4. RIGHTS OFFERINGS: Usually cause temporary price drops as shareholders sell.
+
+=== APPLYING THE MAGIC FORMULA TO ANNUAL REPORTS ===
+
+When reading an annual report through Greenblatt's lens, focus on:
+
+1. QUALITY (Return on Capital):
+   - Calculate EBIT / (Net Fixed Assets + Net Working Capital)
+   - Is this ratio consistently high (>20%)?
+   - Has it been maintained over 5-10 years?
+   - If ROC is declining, the moat may be eroding
+
+2. VALUE (Earnings Yield):
+   - Calculate EBIT / Enterprise Value
+   - Is the yield attractive compared to bonds and the market average?
+   - Use normalized earnings (average over a cycle) for cyclical businesses
+
+3. SUSTAINABILITY:
+   - Why does this business earn high returns?
+   - What protects these returns from competition?
+   - Read the Risk Factors and competitive discussion in the annual report
+
+4. CAPITAL ALLOCATION:
+   - What does management do with the excess cash from high returns?
+   - Reinvest at similar high rates? (Best outcome)
+   - Return to shareholders? (Good outcome)
+   - Waste on bad acquisitions? (Bad outcome)
+
+=== GREENBLATT'S KEY INSIGHT ===
+
+"The magic formula works because it forces you to buy above-average companies at below-average prices. Most investors either buy good companies at any price (growth investors) or cheap companies of any quality (deep value investors). The combination is more powerful than either alone."

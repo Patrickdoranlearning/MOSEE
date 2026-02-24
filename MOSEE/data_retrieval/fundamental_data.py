@@ -2,6 +2,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from typing import Dict, Any, Optional, Tuple
 
 # Import rate limiter utilities
 from MOSEE.data_retrieval.rate_limiter import (
@@ -10,6 +11,171 @@ from MOSEE.data_retrieval.rate_limiter import (
     get_ticker_object,
     with_rate_limit,
 )
+
+
+# =============================================================================
+# EARNINGS CLASSIFICATION — Cyclicality Detection
+# =============================================================================
+
+class EarningsClassification:
+    """Earnings pattern classifications."""
+    STEADY = "Steady Compounder"        # CV < 0.3, consistent growth
+    CYCLICAL = "Cyclical"               # CV 0.3-0.8, earnings swing with cycles
+    TURNAROUND = "Turnaround"           # Recent losses but recovering
+    DISTRESSED = "Distressed"           # CV > 0.8 or persistent negative earnings
+    INSUFFICIENT_DATA = "Insufficient Data"
+
+
+def classify_earnings_pattern(
+    net_income_series: pd.Series,
+    min_years: int = 3
+) -> Dict[str, Any]:
+    """
+    Classify a company's earnings pattern using coefficient of variation (CV).
+
+    This determines whether a company is a steady compounder, cyclical,
+    turnaround, or distressed — which changes how we project future earnings.
+
+    Args:
+        net_income_series: Historical net income values (pandas Series)
+        min_years: Minimum data points required for classification
+
+    Returns:
+        Dictionary with:
+        - classification: EarningsClassification string
+        - cv: Coefficient of variation
+        - has_negative_years: Whether any year had negative earnings
+        - negative_year_count: Number of negative years
+        - latest_positive: Whether the most recent year was positive
+        - normalized_earnings: Average earnings (used for cyclicals)
+    """
+    if not isinstance(net_income_series, pd.Series):
+        return {
+            'classification': EarningsClassification.INSUFFICIENT_DATA,
+            'cv': None,
+            'has_negative_years': False,
+            'negative_year_count': 0,
+            'latest_positive': False,
+            'normalized_earnings': 0,
+            'latest_is_outlier': False,
+            'latest_ratio': None,
+        }
+
+    clean = net_income_series.dropna()
+    if len(clean) < min_years:
+        return {
+            'classification': EarningsClassification.INSUFFICIENT_DATA,
+            'cv': None,
+            'has_negative_years': False,
+            'negative_year_count': 0,
+            'latest_positive': len(clean) > 0 and float(clean.iloc[-1]) > 0,
+            'normalized_earnings': float(clean.median()) if len(clean) > 0 else 0,
+            'latest_is_outlier': False,
+            'latest_ratio': None,
+        }
+
+    values = clean.values.astype(float)
+    mean_val = np.mean(values)
+    std_val = np.std(values)
+    negative_years = int(np.sum(values < 0))
+    latest_positive = float(values[-1]) > 0
+
+    # Coefficient of variation (use absolute mean to handle mixed-sign earnings)
+    cv = float(std_val / abs(mean_val)) if mean_val != 0 else float('inf')
+
+    # Normalized earnings: median of available years (mid-cycle proxy)
+    # Median is robust to outlier years in both directions (EXOR spike / PAH3.DE trough)
+    normalized_earnings = float(np.median(values))
+
+    # Classification logic
+    if negative_years > len(values) / 2:
+        # More than half the years are negative
+        classification = EarningsClassification.DISTRESSED
+    elif negative_years > 0 and latest_positive and cv > 0.5:
+        # Had losses but now profitable with high volatility — turnaround
+        classification = EarningsClassification.TURNAROUND
+    elif negative_years > 0 and negative_years <= len(values) / 2:
+        # Has some bad years but majority profitable — cyclical
+        # (e.g., PAH3.DE: 3 good years, 1 bad year = cyclical, not distressed)
+        classification = EarningsClassification.CYCLICAL
+    elif cv > 0.8:
+        classification = EarningsClassification.DISTRESSED
+    elif cv > 0.3:
+        classification = EarningsClassification.CYCLICAL
+    else:
+        classification = EarningsClassification.STEADY
+
+    # Outlier detection: check if latest year is anomalous vs prior years.
+    # A single exceptional year (up or down) should not be extrapolated forward.
+    # Uses simple ratio vs prior-years median — robust at n=3-4. (Munger: "keep it simple.")
+    # Always compute the ratio — it's useful for any classification.
+    latest_is_outlier = False
+    latest_ratio = None
+    if len(values) >= 3:
+        prior_median = float(np.median(values[:-1]))
+        if prior_median > 0:
+            latest_ratio = float(values[-1] / prior_median)
+            if latest_ratio > 1.8 or latest_ratio < 0.55:
+                latest_is_outlier = True
+                # Promote STEADY to CYCLICAL when outlier detected
+                if classification == EarningsClassification.STEADY:
+                    classification = EarningsClassification.CYCLICAL
+
+    return {
+        'classification': classification,
+        'cv': round(cv, 3),
+        'has_negative_years': negative_years > 0,
+        'negative_year_count': negative_years,
+        'latest_positive': latest_positive,
+        'normalized_earnings': normalized_earnings,
+        'latest_is_outlier': latest_is_outlier,
+        'latest_ratio': round(latest_ratio, 2) if latest_ratio is not None else None,
+    }
+
+
+def dataframe_to_json(df: pd.DataFrame) -> dict:
+    """
+    Convert a yfinance financial statement DataFrame to a JSON-serializable dict.
+
+    Preserves all line items and fiscal year columns.
+    yfinance DataFrames have line items as the index and dates as columns.
+
+    Returns:
+        {
+            "line_items": {
+                "Total Revenue": {"2024": 123000000, "2023": 115000000, ...},
+                ...
+            },
+            "years": ["2021", "2022", "2023", "2024"]
+        }
+    """
+    if df is None or df.empty:
+        return {"line_items": {}, "years": []}
+
+    # Convert column dates to year strings, sorted chronologically
+    years = []
+    for col in df.columns:
+        if hasattr(col, 'year'):
+            years.append(str(col.year))
+        else:
+            years.append(str(col))
+
+    line_items = {}
+    for row_name in df.index:
+        row_data = {}
+        for col, year in zip(df.columns, years):
+            val = df.loc[row_name, col]
+            if pd.isna(val):
+                row_data[year] = None
+            elif isinstance(val, (np.integer, np.int64)):
+                row_data[year] = int(val)
+            elif isinstance(val, (np.floating, np.float64)):
+                row_data[year] = float(val) if not (np.isnan(val) or np.isinf(val)) else None
+            else:
+                row_data[year] = val
+        line_items[str(row_name)] = row_data
+
+    return {"line_items": line_items, "years": sorted(set(years))}
 
 
 def fundamental_downloads(ticker_temp):
@@ -66,7 +232,9 @@ def _get_row_safe(df, possible_names, default=0):
     for name in possible_names:
         if name in df.index:
             return df.loc[name]
-    # Return a series of zeros with same columns if not found
+    # Log when falling back to default - helps diagnose missing data
+    primary_name = possible_names[0] if possible_names else 'unknown'
+    print(f"    Warning: '{primary_name}' not found in financial data (tried {len(possible_names)} variants), using default={default}")
     return pd.Series(default, index=df.columns)
 
 
@@ -354,15 +522,26 @@ def cash_flow_data_dic(cash_flow_statement):
     return cash_flow_data
 
 
-def net_income_expected(cash_flow_statement, years_projection=10, decay_rate=1.25):
+def net_income_expected(cash_flow_statement, years_projection=10, decay_rate=0.8, income_statement=None):
     """
-    This function will return the net_income statistics and projections
+    This function will return the net_income statistics and projections.
+
+    Now includes:
+    - Earnings classification (steady/cyclical/turnaround/distressed)
+    - R² regression fit quality
+    - Projection flooring at zero (no absurd negative extrapolations)
+    - Normalized earnings for cyclical companies (mean-reversion)
 
     Args:
     - cash_flow_statement: DataFrame, takes in the cashflow statement from yfinance.
         Need to be previously downloaded.
     - years_projection int:
-    - decay_rate float: weights the expected earnings to more recent years
+    - decay_rate float: weights the expected earnings to more recent years.
+        Values < 1.0 give MORE weight to recent years (recommended: 0.8).
+        Year 0 (oldest) gets weight decay^N, year N (newest) gets weight 1.0.
+    - income_statement: DataFrame, optional income statement from yfinance.
+        If provided, net income will be sourced from here first as it's more accurate
+        (cash flow's "Net Income From Continuing Operations" can be pretax for some companies)
 
     Returns:
     - net_income: dictionary containing the following keys:
@@ -370,24 +549,70 @@ def net_income_expected(cash_flow_statement, years_projection=10, decay_rate=1.2
         - expected_net_income
         - net_income_average
         - net_income_average_growth
+        - earnings_classification (dict with classification, cv, etc.)
+        - r_squared (regression fit quality, 0-1)
+        - projection_method ('regression', 'normalized', 'flat')
 
     """
     # Cashflow fundamentals
     net_income = {}
 
-    # yfinance uses 'Net Income' or 'Net Income From Continuing Operations'
-    net_income_df = _get_row_safe(cash_flow_statement, [
-        'Net Income',
-        'Net Income From Continuing Operations',
-        'Net Income From Continuing Operation Net Minority Interest'
-    ])
+    # PRIORITY: Try income statement first - it has the true bottom-line net income
+    # The cash flow statement's "Net Income From Continuing Operations" can sometimes
+    # be pretax income or include minority interests (e.g., DTE.DE shows 23B vs 11B actual)
+    net_income_df = None
+
+    if income_statement is not None and not income_statement.empty:
+        # Prefer income statement's Net Income (most accurate bottom-line figure)
+        net_income_df = _get_row_safe(income_statement, [
+            'Net Income',
+            'Net Income Common Stockholders',
+            'Net Income From Continuing Operation Net Minority Interest',
+            'Net Income From Continuing And Discontinued Operation'
+        ])
+        # Check if we got valid data
+        if isinstance(net_income_df, pd.Series) and len(net_income_df.dropna()) == 0:
+            net_income_df = None
+
+    # Fallback to cash flow statement if income statement didn't provide data
+    if net_income_df is None or (isinstance(net_income_df, pd.Series) and net_income_df.isna().all()):
+        net_income_df = _get_row_safe(cash_flow_statement, [
+            'Net Income',
+            'Net Income From Continuing Operations',
+            'Net Income From Continuing Operation Net Minority Interest'
+        ])
+
+    # Default classification and R²
+    earnings_classification = {
+        'classification': EarningsClassification.INSUFFICIENT_DATA,
+        'cv': None,
+        'has_negative_years': False,
+        'negative_year_count': 0,
+        'latest_positive': False,
+        'normalized_earnings': 0,
+        'latest_is_outlier': False,
+        'latest_ratio': None,
+    }
+    r_squared = None
+    projection_method = 'flat'
 
     if isinstance(net_income_df, pd.Series) and len(net_income_df) > 0:
         # Drop NaN values for calculations
         net_income_clean = net_income_df.dropna()
-        
+
+        # Classify earnings pattern BEFORE projecting
+        earnings_classification = classify_earnings_pattern(net_income_clean)
+        classification = earnings_classification['classification']
+
         if len(net_income_clean) > 1:  # Need at least 2 points for regression
-            net_income_average = net_income_clean.values.mean()
+            # Trimmed mean: drop the single highest and lowest values to
+            # resist outlier years (e.g., one-off spikes or write-downs).
+            # With n<=2 we can't trim, so fall back to simple mean.
+            sorted_values = np.sort(net_income_clean.values)
+            if len(sorted_values) > 2:
+                net_income_average = float(np.mean(sorted_values[1:-1]))
+            else:
+                net_income_average = float(np.mean(sorted_values))
 
             numerical_years = list(range(len(net_income_clean)))
 
@@ -395,19 +620,79 @@ def net_income_expected(cash_flow_statement, years_projection=10, decay_rate=1.2
             X = pd.DataFrame(numerical_years)
             y = net_income_clean.values  # Dependent variable (net income)
 
-            # Fit a linear regression model
-            weights = [decay_rate ** i for i in range(len(y))]
+            # Fit a linear regression model with more weight on recent years
+            # Reverse index so newest year (last) gets weight 1.0, oldest gets decay^N
+            n = len(y)
+            weights = [decay_rate ** (n - 1 - i) for i in range(n)]
             model = LinearRegression()
             model.fit(X, y, sample_weight=weights)
+
+            # Calculate R² (regression fit quality)
+            y_pred = model.predict(X)
+            ss_res = np.sum(weights * (y - y_pred) ** 2)
+            ss_tot = np.sum(weights * (y - np.average(y, weights=weights)) ** 2)
+            r_squared = float(1 - ss_res / ss_tot) if ss_tot != 0 else 0.0
+
             net_income_average_growth = model.coef_[0] / net_income_average if net_income_average != 0 else 0
 
-            # Make predictions for future time points
-            future_time_points = [[max(numerical_years) + i + 1] for i in range(years_projection)]
-            expected_net_income = model.predict(future_time_points)
+            # Cap growth rate at sustainable levels
+            MAX_SUSTAINABLE_GROWTH = 0.15  # 15% annual growth cap
+            MIN_GROWTH = -0.10  # -10% floor for declining businesses
+            net_income_average_growth = max(MIN_GROWTH, min(MAX_SUSTAINABLE_GROWTH, net_income_average_growth))
+
+            # PROJECTION STRATEGY based on earnings classification
+            if classification in (EarningsClassification.CYCLICAL, EarningsClassification.TURNAROUND):
+                # CYCLICAL/TURNAROUND: Use normalized (average) earnings instead of
+                # linear extrapolation. Cyclical companies mean-revert; extrapolating
+                # a bad year forward is the #1 cause of absurd projections (PAH3.DE bug).
+                normalized = earnings_classification['normalized_earnings']
+                # Use modest growth from normalized base (mean-reversion assumption)
+                modest_growth = max(0, min(net_income_average_growth, 0.05))
+                expected_net_income = [
+                    normalized * ((1 + modest_growth) ** (i + 1))
+                    for i in range(years_projection)
+                ]
+                projection_method = 'normalized'
+                outlier_note = ""
+                if earnings_classification.get('latest_is_outlier'):
+                    outlier_note = f" (latest year {earnings_classification['latest_ratio']:.1f}x prior median — outlier)"
+                print(f"    [Cyclical] Using normalized earnings ({classification}){outlier_note}: {normalized:.0f} with {modest_growth:.1%} growth")
+
+            elif classification == EarningsClassification.DISTRESSED:
+                # DISTRESSED: Use normalized earnings with no growth
+                normalized = max(0, earnings_classification['normalized_earnings'])
+                expected_net_income = [normalized] * years_projection
+                projection_method = 'normalized'
+                print(f"    [Distressed] Using flat normalized earnings: {normalized:.0f}")
+
+            elif r_squared is not None and r_squared < 0.3:
+                # POOR FIT: Regression doesn't explain the data well.
+                # Fall back to normalized earnings with capped growth.
+                normalized = earnings_classification['normalized_earnings']
+                modest_growth = max(0, min(net_income_average_growth, 0.05))
+                expected_net_income = [
+                    normalized * ((1 + modest_growth) ** (i + 1))
+                    for i in range(years_projection)
+                ]
+                projection_method = 'normalized'
+                print(f"    [Low R²={r_squared:.2f}] Using normalized earnings instead of regression")
+
+            else:
+                # STEADY: Linear regression is appropriate
+                future_time_points = [[max(numerical_years) + i + 1] for i in range(years_projection)]
+                expected_net_income = model.predict(future_time_points)
+                projection_method = 'regression'
+
+            # FLOOR: No projected net income below zero for valuation purposes.
+            # A company can't have negative market cap. Negative projections from
+            # extrapolation are the model breaking, not reality.
+            expected_net_income = [max(0, float(x)) for x in expected_net_income]
+
         elif len(net_income_clean) == 1:
             net_income_average = float(net_income_clean.values[0])
             net_income_average_growth = 0
-            expected_net_income = [net_income_average] * years_projection
+            expected_net_income = [max(0, net_income_average)] * years_projection
+            projection_method = 'flat'
         else:
             net_income_average = 0
             net_income_average_growth = 0
@@ -421,6 +706,9 @@ def net_income_expected(cash_flow_statement, years_projection=10, decay_rate=1.2
     net_income['expected_net_income'] = expected_net_income
     net_income['net_income_average'] = net_income_average
     net_income['net_income_average_growth'] = net_income_average_growth
+    net_income['earnings_classification'] = earnings_classification
+    net_income['r_squared'] = r_squared
+    net_income['projection_method'] = projection_method
 
     return net_income
 
@@ -472,6 +760,11 @@ def dividends_expected_dic(cash_flow_statement, years_projection=10):
             future_time_points = [[max(numerical_years) + i + 1] for i in range(years_projection)]
             expected_dividend = model.predict(future_time_points)
             dividend_average_growth = model.coef_[0] / dividend_average if dividend_average != 0 else 0
+
+            # Cap dividend growth at sustainable levels
+            MAX_DIVIDEND_GROWTH = 0.10  # 10% annual growth cap for dividends
+            MIN_GROWTH = -0.05  # -5% floor
+            dividend_average_growth = max(MIN_GROWTH, min(MAX_DIVIDEND_GROWTH, dividend_average_growth))
         elif len(dividends_clean) == 1:
             dividend_average = float(dividends_clean.values[0])
             dividend_average_growth = 0
@@ -493,7 +786,7 @@ def dividends_expected_dic(cash_flow_statement, years_projection=10):
     return dividends_dic
 
 
-def stock_buybacks_expected(cash_flow_statement, years_projection=10, decay_rate=1.5):
+def stock_buybacks_expected(cash_flow_statement, years_projection=10, decay_rate=0.8):
     """
     This function will calculate the value of stock buybacks using weighted linear regression.
 
@@ -537,8 +830,9 @@ def stock_buybacks_expected(cash_flow_statement, years_projection=10, decay_rate
             X = pd.DataFrame(numerical_years)
             y = buybacks_clean.values  # Dependent variable (stock buybacks)
 
-            # Fit a weighted linear regression model
-            weights = [decay_rate ** i for i in range(len(y))]
+            # Fit a weighted linear regression model (more weight on recent years)
+            n = len(y)
+            weights = [decay_rate ** (n - 1 - i) for i in range(n)]
             model = LinearRegression()
             model.fit(X, y, sample_weight=weights)
             buyback_average_growth = model.coef_[0] / buyback_average if buyback_average != 0 else 0

@@ -190,9 +190,14 @@ class CompositeValuationRange:
         else:
             uncertainty_factor = 0.50
         
-        # Ensure conservative is at least (1 - uncertainty) of base
-        min_conservative = self.composite_base * (1 - uncertainty_factor)
-        self.composite_conservative = min(self.composite_conservative, min_conservative)
+        # Set a floor so one wildly pessimistic method doesn't drag conservative too low,
+        # but use the LOWER of composite_conservative and the floor to preserve real margin of safety.
+        # The floor prevents obviously wrong values (e.g., one method returning near-zero).
+        floor_conservative = self.composite_base * (1 - uncertainty_factor)
+        # Only raise to floor if conservative is unreasonably low (< 50% of floor)
+        # This preserves genuine margin of safety from conservative valuation methods
+        if self.composite_conservative < floor_conservative * 0.5:
+            self.composite_conservative = floor_conservative
         
         # Ensure optimistic doesn't exceed (1 + uncertainty) of base
         max_optimistic = self.composite_base * (1 + uncertainty_factor)
@@ -234,14 +239,21 @@ class CompositeValuationRange:
         confidence_score += min(20, len(self.individual_ranges) * 5)
         
         # Map to confidence level
+        # If we have at least 2 valid valuation methods, never go below LOW
+        # This prevents showing "INSUFFICIENT DATA" when we actually have valuations
+        min_confidence = ValueConfidence.SPECULATIVE
+        if len(self.individual_ranges) >= 2:
+            min_confidence = ValueConfidence.LOW
+
         if confidence_score >= 70:
             self.composite_confidence = ValueConfidence.HIGH
         elif confidence_score >= 50:
             self.composite_confidence = ValueConfidence.MEDIUM
-        elif confidence_score >= 30:
+        elif confidence_score >= 20:
             self.composite_confidence = ValueConfidence.LOW
         else:
-            self.composite_confidence = ValueConfidence.SPECULATIVE
+            # Use minimum confidence based on number of valuation methods
+            self.composite_confidence = min_confidence
     
     def margin_of_safety(self, current_price: float) -> float:
         """MoS against composite conservative value."""
@@ -351,61 +363,103 @@ def create_dcf_range(
 ) -> ValuationRange:
     """
     Create DCF valuation range with scenario analysis.
-    
+
     Conservative: Lower growth, higher discount rate
     Base: Expected values
     Optimistic: Higher growth, lower discount rate
     """
-    def dcf_value(cf, g, r, tg, n):
-        """Calculate DCF value."""
+    # Cap growth rate at sustainable levels - no company grows 50%+ forever
+    MAX_GROWTH = 0.15  # 15% max
+    growth_rate = min(growth_rate, MAX_GROWTH)
+
+    def dcf_value_detailed(cf, g, r, tg, n):
+        """Calculate DCF value with year-by-year breakdown."""
         value = 0
+        year_by_year = []
         for i in range(1, n + 1):
             future_cf = cf * (1 + g) ** i
-            value += future_cf / (1 + r) ** i
-        
+            pv = future_cf / (1 + r) ** i
+            value += pv
+            year_by_year.append({
+                'year': i,
+                'future_cf': round(future_cf, 2),
+                'discount_factor': round(1 / (1 + r) ** i, 6),
+                'present_value': round(pv, 2),
+            })
+
         # Terminal value
         terminal_cf = cf * (1 + g) ** n * (1 + tg)
         terminal_value = terminal_cf / (r - tg) if r > tg else 0
-        value += terminal_value / (1 + r) ** n
-        
-        return value / shares_outstanding if shares_outstanding > 0 else 0
-    
-    # Scenario adjustments
-    conservative = dcf_value(
+        pv_terminal = terminal_value / (1 + r) ** n
+        value += pv_terminal
+
+        per_share = value / shares_outstanding if shares_outstanding > 0 else 0
+        return per_share, year_by_year, round(pv_terminal / shares_outstanding if shares_outstanding > 0 else 0, 2)
+
+    # Scenario adjustments with full breakdowns
+    cons_val, cons_years, cons_terminal = dcf_value_detailed(
         base_cashflow * 0.9,  # 10% lower cash flow
         growth_rate * 0.7,    # 30% lower growth
         discount_rate + 0.02,  # 2% higher discount (more risk)
         terminal_growth * 0.8,
         years
     )
-    
-    base = dcf_value(
+
+    base_val, base_years, base_terminal = dcf_value_detailed(
         base_cashflow,
         growth_rate,
         discount_rate,
         terminal_growth,
         years
     )
-    
-    optimistic = dcf_value(
+
+    opt_val, opt_years, opt_terminal = dcf_value_detailed(
         base_cashflow * 1.1,   # 10% higher cash flow
         growth_rate * 1.2,     # 20% higher growth
         discount_rate - 0.01,  # 1% lower discount
         terminal_growth * 1.1,
         years
     )
-    
+
     return ValuationRange(
-        conservative=conservative,
-        base=base,
-        optimistic=optimistic,
+        conservative=cons_val,
+        base=base_val,
+        optimistic=opt_val,
         method="DCF",
         confidence=ValueConfidence.MEDIUM,
         assumptions={
             "base_cashflow": base_cashflow,
             "growth_rate": growth_rate,
             "discount_rate": discount_rate,
-            "years": years
+            "terminal_growth": terminal_growth,
+            "years": years,
+            "shares_outstanding": shares_outstanding,
+            "scenarios": {
+                "conservative": {
+                    "cashflow_adj": "90% of base",
+                    "growth_adj": "70% of base",
+                    "discount_adj": "+2%",
+                    "year_by_year": cons_years,
+                    "terminal_pv_per_share": cons_terminal,
+                    "value_per_share": round(cons_val, 2),
+                },
+                "base": {
+                    "cashflow_adj": "100%",
+                    "growth_adj": "100%",
+                    "discount_adj": "0%",
+                    "year_by_year": base_years,
+                    "terminal_pv_per_share": base_terminal,
+                    "value_per_share": round(base_val, 2),
+                },
+                "optimistic": {
+                    "cashflow_adj": "110% of base",
+                    "growth_adj": "120% of base",
+                    "discount_adj": "-1%",
+                    "year_by_year": opt_years,
+                    "terminal_pv_per_share": opt_terminal,
+                    "value_per_share": round(opt_val, 2),
+                },
+            }
         }
     )
 
@@ -418,9 +472,13 @@ def create_earnings_range(
 ) -> ValuationRange:
     """
     Create earnings-based valuation range.
-    
+
     Quality affects what P/E multiple is deserved.
     """
+    # Cap growth rate at sustainable levels
+    MAX_GROWTH = 0.20  # 20% max for P/E adjustment
+    growth_rate = min(growth_rate, MAX_GROWTH)
+
     # Quality-adjusted P/E
     # High quality (80+) deserves premium (1.5x industry)
     # Low quality (<40) deserves discount (0.6x industry)
@@ -438,11 +496,15 @@ def create_earnings_range(
     growth_multiple = min(2.0, max(0.5, 1 + growth_rate))
     
     fair_pe = industry_pe * quality_multiple * growth_multiple
-    
+
+    # Cap P/E at reasonable levels - even great companies rarely sustain 40+ P/E
+    MAX_PE = 40
+    fair_pe = min(fair_pe, MAX_PE)
+
     conservative = eps * fair_pe * 0.7   # 30% discount
     base = eps * fair_pe
     optimistic = eps * fair_pe * 1.3     # 30% premium
-    
+
     return ValuationRange(
         conservative=conservative,
         base=base,
@@ -451,9 +513,21 @@ def create_earnings_range(
         confidence=ValueConfidence.MEDIUM if quality_score >= 50 else ValueConfidence.LOW,
         assumptions={
             "eps": eps,
-            "fair_pe": round(fair_pe, 1),
+            "industry_pe": industry_pe,
+            "quality_score": quality_score,
             "quality_multiple": quality_multiple,
-            "growth_multiple": round(growth_multiple, 2)
+            "growth_rate": growth_rate,
+            "growth_multiple": round(growth_multiple, 2),
+            "fair_pe": round(fair_pe, 1),
+            "calculation_chain": [
+                f"Industry P/E = {industry_pe}",
+                f"Quality Multiple = {quality_multiple}x (quality score {quality_score:.0f})",
+                f"Growth Multiple = {growth_multiple:.2f}x (growth {growth_rate:.1%})",
+                f"Fair P/E = {industry_pe} x {quality_multiple} x {growth_multiple:.2f} = {fair_pe:.1f}",
+                f"Base Value = EPS(${eps:.2f}) x Fair P/E({fair_pe:.1f}) = ${base:.2f}",
+                f"Conservative = Base x 0.7 = ${conservative:.2f}",
+                f"Optimistic = Base x 1.3 = ${optimistic:.2f}",
+            ],
         }
     )
 
@@ -465,16 +539,20 @@ def create_book_value_range(
 ) -> ValuationRange:
     """
     Create book value based range.
-    
+
     High ROE companies deserve premium to book.
     """
-    # ROE-based multiple
-    # ROE > 20% = 3x book
+    # ROE-based multiple with graduated scale
+    # Very high ROEs (>50%) are typically unsustainable, so we cap the premium
+    # ROE 30%+ = 4x book (capped)
+    # ROE 20-30% = 3x book
     # ROE 15-20% = 2x book
     # ROE 10-15% = 1.5x book
     # ROE < 10% = 1x book or less
-    
-    if roe >= 0.20:
+
+    if roe >= 0.30:
+        roe_multiple = 4.0  # Cap at 4x even for exceptional ROEs
+    elif roe >= 0.20:
         roe_multiple = 3.0
     elif roe >= 0.15:
         roe_multiple = 2.0
@@ -491,7 +569,7 @@ def create_book_value_range(
     conservative = book_value_per_share * fair_multiple * 0.6
     base = book_value_per_share * fair_multiple
     optimistic = book_value_per_share * fair_multiple * 1.4
-    
+
     return ValuationRange(
         conservative=conservative,
         base=base,
@@ -501,7 +579,18 @@ def create_book_value_range(
         assumptions={
             "book_value_per_share": book_value_per_share,
             "roe": round(roe, 3),
-            "fair_pb_multiple": round(fair_multiple, 2)
+            "roe_multiple": roe_multiple,
+            "quality_score": quality_score,
+            "quality_adjustment": round(quality_adj, 2),
+            "fair_pb_multiple": round(fair_multiple, 2),
+            "calculation_chain": [
+                f"ROE = {roe:.1%} -> ROE Multiple = {roe_multiple}x",
+                f"Quality Adjustment = {quality_adj:.2f} (score {quality_score:.0f})",
+                f"Fair P/B = {roe_multiple} x {quality_adj:.2f} = {fair_multiple:.2f}x",
+                f"Base Value = BVPS(${book_value_per_share:.2f}) x {fair_multiple:.2f} = ${base:.2f}",
+                f"Conservative = Base x 0.6 = ${conservative:.2f}",
+                f"Optimistic = Base x 1.4 = ${optimistic:.2f}",
+            ],
         }
     )
 
@@ -513,33 +602,37 @@ def create_owner_earnings_range(
 ) -> ValuationRange:
     """
     Create Buffett-style owner earnings valuation range.
-    
+
     Value = Owner Earnings / (Required Return - Growth Rate)
     This is essentially a growing perpetuity formula.
     """
+    # Cap growth rate - perpetuity formula explodes when g approaches r
+    # Max sustainable long-term growth is ~GDP growth + inflation (~5%)
+    MAX_PERPETUITY_GROWTH = 0.06  # 6% max for perpetuity calculations
+    growth_rate = min(growth_rate, MAX_PERPETUITY_GROWTH)
+
     def perpetuity_value(oe, g, r):
         if r <= g:
             return oe * 20  # Cap at 20x if growth exceeds required return
-        return oe / (r - g)
+        value = oe / (r - g)
+        # Cap at 30x owner earnings to prevent absurd valuations
+        return min(value, oe * 30)
     
-    conservative = perpetuity_value(
-        owner_earnings_per_share * 0.85,
-        growth_rate * 0.6,
-        required_return + 0.03
-    )
-    
-    base = perpetuity_value(
-        owner_earnings_per_share,
-        growth_rate,
-        required_return
-    )
-    
-    optimistic = perpetuity_value(
-        owner_earnings_per_share * 1.15,
-        min(growth_rate * 1.3, required_return - 0.01),
-        required_return - 0.02
-    )
-    
+    cons_oe = owner_earnings_per_share * 0.85
+    cons_g = growth_rate * 0.6
+    cons_r = required_return + 0.03
+    conservative = perpetuity_value(cons_oe, cons_g, cons_r)
+
+    base_oe = owner_earnings_per_share
+    base_g = growth_rate
+    base_r = required_return
+    base = perpetuity_value(base_oe, base_g, base_r)
+
+    opt_oe = owner_earnings_per_share * 1.15
+    opt_g = min(growth_rate * 1.3, required_return - 0.01)
+    opt_r = required_return - 0.02
+    optimistic = perpetuity_value(opt_oe, opt_g, opt_r)
+
     return ValuationRange(
         conservative=conservative,
         base=base,
@@ -549,7 +642,28 @@ def create_owner_earnings_range(
         assumptions={
             "owner_earnings_per_share": owner_earnings_per_share,
             "growth_rate": growth_rate,
-            "required_return": required_return
+            "required_return": required_return,
+            "formula": "Value = Owner Earnings / (Required Return - Growth Rate)",
+            "scenarios": {
+                "conservative": {
+                    "owner_earnings": round(cons_oe, 2),
+                    "growth": f"{cons_g:.1%}",
+                    "required_return": f"{cons_r:.1%}",
+                    "value": round(conservative, 2),
+                },
+                "base": {
+                    "owner_earnings": round(base_oe, 2),
+                    "growth": f"{base_g:.1%}",
+                    "required_return": f"{base_r:.1%}",
+                    "value": round(base, 2),
+                },
+                "optimistic": {
+                    "owner_earnings": round(opt_oe, 2),
+                    "growth": f"{opt_g:.1%}",
+                    "required_return": f"{opt_r:.1%}",
+                    "value": round(optimistic, 2),
+                },
+            },
         }
     )
 
@@ -605,7 +719,18 @@ def build_composite_valuation(
             required_return=metrics.get('required_return', 0.10)
         )
         ranges.append(oe_range)
-    
+
+    # Sanity check: Cap all valuations at reasonable P/E multiples
+    # Even the best companies rarely sustain 50x P/E over the long term
+    MAX_PE_CAP = 50
+    eps = metrics.get('eps', 0)
+    if eps and eps > 0:
+        max_reasonable_value = eps * MAX_PE_CAP
+        for r in ranges:
+            r.conservative = min(r.conservative, max_reasonable_value * 0.7)
+            r.base = min(r.base, max_reasonable_value)
+            r.optimistic = min(r.optimistic, max_reasonable_value * 1.3)
+
     return CompositeValuationRange(
         ticker=ticker,
         individual_ranges=ranges,
