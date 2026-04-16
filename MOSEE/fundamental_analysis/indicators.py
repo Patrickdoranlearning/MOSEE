@@ -75,7 +75,7 @@ def calculate_graham_defensive_criteria(
     current_price: float,
     book_value_per_share: float,
     revenue_threshold: float = 500_000_000,  # $500M default
-    years_required: int = 5
+    years_required: int = 10
 ) -> GrahamCriteriaResult:
     """
     Evaluate Graham's 7 Defensive Criteria from The Intelligent Investor.
@@ -129,9 +129,17 @@ def calculate_graham_defensive_criteria(
         details["strong_financial_condition"] = f"Current Ratio {current_ratio:.2f} < 2.0"
     
     # 3. Earnings Stability (positive earnings each year)
-    if isinstance(net_income_history, pd.Series) and len(net_income_history) >= years_required:
-        positive_years = (net_income_history > 0).sum()
-        total_years = len(net_income_history)
+    # Graham specified 10 years of positive earnings. With SEC EDGAR we often
+    # have 15-20 years. Use up to years_required (default 10), but accept 5+
+    # as a minimum so stocks with shorter history can still be evaluated.
+    MIN_EARNINGS_YEARS = 5
+    if isinstance(net_income_history, pd.Series) and len(net_income_history) >= MIN_EARNINGS_YEARS:
+        # Use the most recent years_required years (or all if fewer)
+        check_years = min(years_required, len(net_income_history))
+        recent_income = net_income_history.iloc[-check_years:]
+        positive_years = (recent_income > 0).sum()
+        total_years = len(recent_income)
+        details["earnings_years_checked"] = total_years
         details["earnings_years_positive"] = f"{positive_years}/{total_years}"
         if positive_years == total_years:
             criteria_passed.append("earnings_stability")
@@ -141,7 +149,8 @@ def calculate_graham_defensive_criteria(
             details["earnings_stability"] = f"Only {positive_years}/{total_years} years profitable"
     else:
         criteria_failed.append("earnings_stability")
-        details["earnings_stability"] = "Insufficient earnings history"
+        available = len(net_income_history) if isinstance(net_income_history, pd.Series) else 0
+        details["earnings_stability"] = f"Insufficient earnings history ({available} years, need {MIN_EARNINGS_YEARS}+)"
     
     # 4. Dividend Record (uninterrupted dividends)
     if isinstance(dividends_history, pd.Series) and len(dividends_history) >= years_required:
@@ -159,15 +168,27 @@ def calculate_graham_defensive_criteria(
         details["dividend_record"] = "Insufficient dividend history"
     
     # 5. Earnings Growth (>= 33% over 10 years, or ~3% CAGR)
-    if eps_10yr_ago > 0 and eps_current > 0:
-        eps_growth = (eps_current - eps_10yr_ago) / eps_10yr_ago
+    # With extended history, prefer actual 10-year comparison from the data
+    # over the eps_10yr_ago parameter which may be estimated.
+    actual_eps_10yr_ago = eps_10yr_ago
+    eps_comparison_years = 10
+    if isinstance(net_income_history, pd.Series) and len(net_income_history) >= 10:
+        # Use actual EPS from ~10 years ago in the data
+        actual_eps_10yr_ago = net_income_history.iloc[-10] if len(net_income_history) >= 10 else eps_10yr_ago
+        eps_comparison_years = min(10, len(net_income_history))
+        details["eps_growth_source"] = f"actual {eps_comparison_years}-year data"
+    else:
+        details["eps_growth_source"] = "estimated"
+
+    if actual_eps_10yr_ago > 0 and eps_current > 0:
+        eps_growth = (eps_current - actual_eps_10yr_ago) / actual_eps_10yr_ago
         details["eps_growth_pct"] = round(eps_growth * 100, 1)
         if eps_growth >= 0.33:  # 33% total growth
             criteria_passed.append("earnings_growth")
-            details["earnings_growth"] = f"EPS growth {eps_growth:.1%} >= 33%"
+            details["earnings_growth"] = f"EPS growth {eps_growth:.1%} >= 33% ({eps_comparison_years}yr)"
         else:
             criteria_failed.append("earnings_growth")
-            details["earnings_growth"] = f"EPS growth {eps_growth:.1%} < 33%"
+            details["earnings_growth"] = f"EPS growth {eps_growth:.1%} < 33% ({eps_comparison_years}yr)"
     else:
         criteria_failed.append("earnings_growth")
         details["earnings_growth"] = "Cannot calculate EPS growth"

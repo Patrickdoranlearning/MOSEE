@@ -187,6 +187,24 @@ def init_database():
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_mosee_raw_data_ticker ON mosee_raw_data(ticker)")
 
+    # Financial data warehouse — accumulates history over time
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS mosee_financial_history (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            ticker TEXT NOT NULL,
+            statement_type TEXT NOT NULL CHECK (statement_type IN (
+                'income_statement', 'balance_sheet', 'cash_flow'
+            )),
+            fiscal_year INTEGER NOT NULL,
+            data JSONB NOT NULL DEFAULT '{}'::jsonb,
+            currency TEXT NOT NULL DEFAULT 'USD',
+            source TEXT NOT NULL DEFAULT 'yfinance',
+            fetched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            UNIQUE(ticker, statement_type, fiscal_year)
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_fh_ticker_stmt ON mosee_financial_history(ticker, statement_type)")
+
     # Create SEC filings cache table (for AI analysis)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS mosee_sec_filings (
@@ -685,6 +703,162 @@ class MOSEEDatabaseClient:
             except:
                 pass
             return False
+
+    # ===== Financial History Warehouse Methods =====
+
+    def save_financial_history(
+        self,
+        ticker: str,
+        statement_type: str,
+        statement_json: Dict[str, Any],
+        currency: str = 'USD',
+        source: str = 'yfinance',
+    ) -> int:
+        """
+        Decompose a financial statement into per-year rows and save to warehouse.
+
+        Append-only: historical years use ON CONFLICT DO NOTHING.
+        The most recent fiscal year may be updated (data revisions).
+
+        Args:
+            ticker: Stock ticker
+            statement_type: 'income_statement', 'balance_sheet', or 'cash_flow'
+            statement_json: Output of dataframe_to_json() with 'line_items' and 'years'
+            currency: Original reporting currency
+            source: Data source identifier
+
+        Returns:
+            Number of new rows inserted
+        """
+        line_items = statement_json.get('line_items', {})
+        years = statement_json.get('years', [])
+
+        if not line_items or not years:
+            return 0
+
+        conn = self._get_conn()
+        cur = conn.cursor()
+        inserted = 0
+
+        latest_year = max(int(y) for y in years)
+
+        try:
+            for year_str in years:
+                year_int = int(year_str)
+
+                # Build single-year data dict
+                year_data = {}
+                for field_name, year_values in line_items.items():
+                    val = year_values.get(year_str)
+                    if val is not None:
+                        year_data[field_name] = val
+
+                if not year_data:
+                    continue
+
+                if year_int == latest_year:
+                    # Latest year: may be updated (restated quarterly data)
+                    cur.execute("""
+                        INSERT INTO mosee_financial_history
+                            (ticker, statement_type, fiscal_year, data, currency, source)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (ticker, statement_type, fiscal_year) DO UPDATE SET
+                            data = EXCLUDED.data,
+                            source = EXCLUDED.source,
+                            fetched_at = now()
+                        WHERE mosee_financial_history.fetched_at < now() - INTERVAL '1 day'
+                    """, (ticker, statement_type, year_int,
+                          Json(clean_dict_for_json(year_data)), currency, source))
+                else:
+                    # Historical year: never overwrite
+                    cur.execute("""
+                        INSERT INTO mosee_financial_history
+                            (ticker, statement_type, fiscal_year, data, currency, source)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (ticker, statement_type, fiscal_year) DO NOTHING
+                    """, (ticker, statement_type, year_int,
+                          Json(clean_dict_for_json(year_data)), currency, source))
+
+                if cur.rowcount > 0:
+                    inserted += 1
+
+            conn.commit()
+            cur.close()
+            return inserted
+
+        except Exception as e:
+            print(f"Error saving financial history for {ticker}/{statement_type}: {e}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            return 0
+
+    def get_financial_history(
+        self,
+        ticker: str,
+        statement_type: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve accumulated financial history in dataframe_to_json() format.
+
+        Returns:
+            {"line_items": {"Net Income": {"2015": val, ...}}, "years": [...]}
+            or None if no data.
+        """
+        try:
+            conn = self._get_conn()
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT fiscal_year, data, currency, source
+                FROM mosee_financial_history
+                WHERE ticker = %s AND statement_type = %s
+                ORDER BY fiscal_year ASC
+            """, (ticker, statement_type))
+            rows = cur.fetchall()
+            cur.close()
+
+            if not rows:
+                return None
+
+            all_years = []
+            line_items = {}
+
+            for row in rows:
+                year_str = str(row['fiscal_year'])
+                all_years.append(year_str)
+                year_data = row['data'] if isinstance(row['data'], dict) else {}
+
+                for field_name, value in year_data.items():
+                    if field_name not in line_items:
+                        line_items[field_name] = {}
+                    line_items[field_name][year_str] = value
+
+            return {
+                "line_items": line_items,
+                "years": sorted(all_years),
+            }
+
+        except Exception as e:
+            print(f"Error fetching financial history for {ticker}/{statement_type}: {e}")
+            return None
+
+    def get_financial_history_years(self, ticker: str, statement_type: str) -> List[int]:
+        """Return list of fiscal years stored for this ticker/statement."""
+        try:
+            conn = self._get_conn()
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT fiscal_year FROM mosee_financial_history
+                WHERE ticker = %s AND statement_type = %s
+                ORDER BY fiscal_year ASC
+            """, (ticker, statement_type))
+            rows = cur.fetchall()
+            cur.close()
+            return [row['fiscal_year'] for row in rows]
+        except Exception as e:
+            print(f"Error fetching history years for {ticker}: {e}")
+            return []
 
     # ===== SEC Filing Cache Methods =====
 

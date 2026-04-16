@@ -95,6 +95,8 @@ def run_single_analysis(
     from MOSEE.MOS import mos_dollar
     from MOSEE.confidence import calculate_confidence
     from MOSEE.mosee_intelligence import generate_mosee_intelligence
+    from MOSEE.scoring.scuttlebutt import calculate_scuttlebutt_score
+    from MOSEE.data_retrieval.market_data import get_scuttlebutt_info
     import pandas as pd
 
     try:
@@ -402,7 +404,57 @@ def run_single_analysis(
             book_value=book_valuation
         )
 
+        # Fisher Scuttlebutt Score — competitive advantage analysis
         if debug:
+            print(f"    Calculating scuttlebutt score...")
+
+        scuttlebutt_info = {}
+        try:
+            scuttlebutt_info = get_scuttlebutt_info(ticker)
+        except Exception as e:
+            if debug:
+                print(f"    Could not fetch scuttlebutt info: {e}")
+
+        # Extract R&D and SGA ratios from income data
+        rd_intensity_series = income_dic.get('rd_intensity', pd.Series())
+        sga_ratio_series = income_dic.get('sga_ratio', pd.Series())
+        gross_margin_series = income_dic.get('gross_margin', pd.Series())
+
+        rd_intensity_latest = float(rd_intensity_series.iloc[-1]) if isinstance(rd_intensity_series, pd.Series) and len(rd_intensity_series) > 0 and not pd.isna(rd_intensity_series.iloc[-1]) else None
+        sga_ratio_latest = float(sga_ratio_series.iloc[-1]) if isinstance(sga_ratio_series, pd.Series) and len(sga_ratio_series) > 0 and not pd.isna(sga_ratio_series.iloc[-1]) else None
+        sga_ratio_earliest = float(sga_ratio_series.iloc[0]) if isinstance(sga_ratio_series, pd.Series) and len(sga_ratio_series) > 1 and not pd.isna(sga_ratio_series.iloc[0]) else None
+        gross_margin_latest = float(gross_margin_series.iloc[-1]) if isinstance(gross_margin_series, pd.Series) and len(gross_margin_series) > 0 and not pd.isna(gross_margin_series.iloc[-1]) else 0
+
+        # Growth consistency from Fisher details
+        growth_consistency = 0
+        if hasattr(fisher_metrics, 'details') and 'sales' in fisher_metrics.details:
+            growth_consistency = fisher_metrics.details['sales'].get('growth_consistency', 0)
+
+        earnings_cls_info = net_income_dic.get('earnings_classification', {})
+
+        scuttlebutt_metrics = {
+            'sales_cagr': sales_cagr,
+            'growth_consistency': growth_consistency,
+            'gross_margin_latest': gross_margin_latest,
+            'margin_trend_score': margin_trend_score,
+            'rd_intensity_latest': rd_intensity_latest,
+            'sga_ratio_latest': sga_ratio_latest,
+            'sga_ratio_earliest': sga_ratio_earliest,
+            'free_cash_flow': cf_dic.get('fcf_latest', 0),
+            'net_income_latest': income_dic.get('net_income_latest', net_income_dic['net_income_average']),
+            'debt_to_equity': debt_to_equity,
+            'interest_coverage': interest_coverage,
+            'earnings_classification': earnings_cls_info.get('classification', 'Unknown'),
+            'earnings_cv': earnings_cls_info.get('cv'),
+            'revenue_latest': income_dic.get('revenue_latest', 0),
+            'employee_count': scuttlebutt_info.get('employee_count'),
+            'insider_held': scuttlebutt_info.get('insider_held'),
+            'institutional_held': scuttlebutt_info.get('institutional_held'),
+        }
+        scuttlebutt = calculate_scuttlebutt_score(scuttlebutt_metrics)
+
+        if debug:
+            print(f"    Scuttlebutt score: {scuttlebutt.total_score:.1f} ({scuttlebutt.grade})")
             print(f"    Generating intelligence report...")
 
         # Compile all metrics for intelligence engine
@@ -498,6 +550,21 @@ def run_single_analysis(
         all_metrics['earnings_equity'] = earnings_equity
         all_metrics['market_cap'] = stock_cap
         all_metrics['net_income'] = net_income_dic.get('net_income_average', 0)
+
+        # Scuttlebutt / competitive advantage data
+        all_metrics['scuttlebutt'] = scuttlebutt.to_dict()
+        all_metrics['scuttlebutt_score'] = scuttlebutt.total_score
+        all_metrics['scuttlebutt_grade'] = scuttlebutt.grade
+        all_metrics['rd_intensity'] = rd_intensity_latest
+        all_metrics['sga_ratio'] = sga_ratio_latest
+        all_metrics['employee_count'] = scuttlebutt_info.get('employee_count')
+        all_metrics['insider_held'] = scuttlebutt_info.get('insider_held')
+        all_metrics['institutional_held'] = scuttlebutt_info.get('institutional_held')
+        all_metrics['revenue_per_employee'] = (
+            income_dic.get('revenue_latest', 0) / scuttlebutt_info['employee_count']
+            if scuttlebutt_info.get('employee_count') and scuttlebutt_info['employee_count'] > 0
+            else None
+        )
 
         # ===== VALUATION BASIS DATA =====
         all_metrics['valuation_basis'] = {

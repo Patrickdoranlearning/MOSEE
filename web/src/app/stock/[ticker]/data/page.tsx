@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { getStockAnalysis, getStockRawData } from '@/lib/db'
+import { getStockAnalysis, getStockRawData, getFinancialHistory } from '@/lib/db'
 import { formatCurrency, formatPercent, type RawFinancialStatement } from '@/types/mosee'
 
 export const revalidate = 3600
@@ -122,6 +122,36 @@ export default async function DataPage({ params }: PageProps) {
       rawData = await getStockRawData(ticker)
     } catch {
       // mosee_raw_data table may not exist yet — silently fall through
+    }
+
+    // If raw data is missing or thin, try the financial history warehouse
+    // which accumulates data over time and may have more years.
+    try {
+      const warehouseData = await getFinancialHistory(ticker)
+      if (warehouseData) {
+        const whYears = Math.max(
+          warehouseData.income_statement.years.length,
+          warehouseData.balance_sheet.years.length,
+          warehouseData.cash_flow.years.length,
+        )
+        const rawYears = rawData ? Math.max(
+          rawData.income_statement?.years?.length ?? 0,
+          rawData.balance_sheet?.years?.length ?? 0,
+          rawData.cash_flow?.years?.length ?? 0,
+        ) : 0
+
+        // Use warehouse data if it has more years than the raw snapshot
+        if (whYears > rawYears) {
+          rawData = {
+            ...(rawData || { id: '', ticker, analysis_date: '', market_data: {} as any, currency_info: {} as any, created_at: '' }),
+            income_statement: warehouseData.income_statement,
+            balance_sheet: warehouseData.balance_sheet,
+            cash_flow: warehouseData.cash_flow,
+          } as any
+        }
+      }
+    } catch {
+      // Warehouse table may not exist yet — silently fall through
     }
   }
 
@@ -270,12 +300,75 @@ export default async function DataPage({ params }: PageProps) {
         )}
       </div>
 
-      {/* Section 2: Raw Financial Statements */}
+      {/* Section 2: Data Coverage Summary */}
+      {(() => {
+        const yearsOfHistory = allMetrics.years_of_history as number | undefined
+        const dataSource = allMetrics.data_source as string | undefined
+        const incomeYears = allMetrics.income_years as number | undefined
+        const balanceYears = allMetrics.balance_sheet_years as number | undefined
+        const cashflowYears = allMetrics.cashflow_years as number | undefined
+        if (!yearsOfHistory && !rawData) return null
+
+        // Derive year ranges from raw data if available
+        const incRange = rawData?.income_statement?.years
+        const bsRange = rawData?.balance_sheet?.years
+        const cfRange = rawData?.cash_flow?.years
+
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Data Coverage</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <div className="text-sm text-gray-500">Total History</div>
+                <div className="text-lg font-semibold text-gray-900">
+                  {yearsOfHistory ?? (rawData ? Math.max(incRange?.length ?? 0, bsRange?.length ?? 0, cfRange?.length ?? 0) : 'N/A')} years
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-500">Income Statement</div>
+                <div className="text-lg font-semibold text-gray-900">
+                  {incomeYears ?? incRange?.length ?? 'N/A'} years
+                </div>
+                {incRange && incRange.length >= 2 && (
+                  <div className="text-xs text-gray-400">{incRange[0]} — {incRange[incRange.length - 1]}</div>
+                )}
+              </div>
+              <div>
+                <div className="text-sm text-gray-500">Balance Sheet</div>
+                <div className="text-lg font-semibold text-gray-900">
+                  {balanceYears ?? bsRange?.length ?? 'N/A'} years
+                </div>
+                {bsRange && bsRange.length >= 2 && (
+                  <div className="text-xs text-gray-400">{bsRange[0]} — {bsRange[bsRange.length - 1]}</div>
+                )}
+              </div>
+              <div>
+                <div className="text-sm text-gray-500">Cash Flow</div>
+                <div className="text-lg font-semibold text-gray-900">
+                  {cashflowYears ?? cfRange?.length ?? 'N/A'} years
+                </div>
+                {cfRange && cfRange.length >= 2 && (
+                  <div className="text-xs text-gray-400">{cfRange[0]} — {cfRange[cfRange.length - 1]}</div>
+                )}
+              </div>
+            </div>
+            {dataSource && (
+              <div className="mt-3 pt-3 border-t border-gray-100 text-sm text-gray-500">
+                Data source: <span className="font-medium text-gray-700">{dataSource}</span>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* Section 3: Raw Financial Statements */}
       {rawData && (
         <div className="space-y-4 mb-6">
           <h2 className="text-lg font-semibold text-gray-900">
             Raw Financial Statements
-            <span className="text-sm font-normal text-gray-500 ml-2">(from yfinance)</span>
+            <span className="text-sm font-normal text-gray-500 ml-2">
+              ({(allMetrics.data_source as string) || 'yfinance'})
+            </span>
           </h2>
           <FinancialStatementTable
             title="Income Statement"

@@ -166,7 +166,7 @@ export function StockTable({ stocks, compact = false }: StockTableProps) {
             return (
               <tr key={stock.id} className="hover:bg-gray-50 cursor-pointer">
                 <td className={`${cellPad} whitespace-nowrap`}>
-                  <Link href={`/stock/${stock.ticker}`} className="block">
+                  <Link href={`/stock/${encodeURIComponent(stock.ticker)}`} className="block">
                     <div className="font-medium text-gray-900">{stock.ticker}</div>
                     <div className="text-sm text-gray-500 max-w-[150px] truncate">
                       {stock.company_name}
@@ -174,52 +174,52 @@ export function StockTable({ stocks, compact = false }: StockTableProps) {
                   </Link>
                 </td>
                 <td className={`${cellPad} whitespace-nowrap`}>
-                  <Link href={`/stock/${stock.ticker}`}>
+                  <Link href={`/stock/${encodeURIComponent(stock.ticker)}`}>
                     <VerdictBadge verdict={stock.verdict} size="sm" />
                   </Link>
                 </td>
                 <td className={`${cellPad} whitespace-nowrap`}>
-                  <Link href={`/stock/${stock.ticker}`}>
+                  <Link href={`/stock/${encodeURIComponent(stock.ticker)}`}>
                     <QualityBadge grade={stock.quality_grade} />
                   </Link>
                 </td>
                 <td className={`${cellPad} whitespace-nowrap text-sm`}>
-                  <Link href={`/stock/${stock.ticker}`} className="block">
+                  <Link href={`/stock/${encodeURIComponent(stock.ticker)}`} className="block">
                     {formatCurrency(stock.current_price)}
                   </Link>
                 </td>
                 <td className={`${cellPad} whitespace-nowrap text-sm text-green-600 font-medium`}>
-                  <Link href={`/stock/${stock.ticker}`} className="block">
+                  <Link href={`/stock/${encodeURIComponent(stock.ticker)}`} className="block">
                     {stock.buy_below_price ? formatCurrency(stock.buy_below_price) : 'N/A'}
                   </Link>
                 </td>
                 <td className={`${cellPad} whitespace-nowrap text-sm`}>
-                  <Link href={`/stock/${stock.ticker}`} className="block">
+                  <Link href={`/stock/${encodeURIComponent(stock.ticker)}`} className="block">
                     <span className={getMOSEEColor(moseeScore)}>
                       {formatMOSEE(moseeScore)}
                     </span>
                   </Link>
                 </td>
                 <td className={`${cellPad} whitespace-nowrap text-sm`}>
-                  <Link href={`/stock/${stock.ticker}`} className="block">
+                  <Link href={`/stock/${encodeURIComponent(stock.ticker)}`} className="block">
                     <span className={stock.has_margin_of_safety ? 'text-green-600 font-medium' : 'text-orange-500'}>
                       {formatMoS(stock.margin_of_safety)}
                     </span>
                   </Link>
                 </td>
                 <td className={`${cellPad} whitespace-nowrap text-sm text-gray-500`}>
-                  <Link href={`/stock/${stock.ticker}`} className="block max-w-[120px] truncate">
+                  <Link href={`/stock/${encodeURIComponent(stock.ticker)}`} className="block max-w-[120px] truncate">
                     {stock.industry || 'N/A'}
                   </Link>
                 </td>
                 <td className={`${cellPad} whitespace-nowrap text-sm text-gray-500`}>
-                  <Link href={`/stock/${stock.ticker}`} className="block">
+                  <Link href={`/stock/${encodeURIComponent(stock.ticker)}`} className="block">
                     {stock.cap_size || 'N/A'}
                   </Link>
                 </td>
                 <td className={`${cellPad} whitespace-nowrap text-sm`}>
                   <Link
-                    href={`/stock/${stock.ticker}`}
+                    href={`/stock/${encodeURIComponent(stock.ticker)}`}
                     className="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md transition-colors"
                   >
                     View

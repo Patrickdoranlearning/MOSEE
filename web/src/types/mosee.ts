@@ -13,6 +13,31 @@ export type Verdict =
 
 export type QualityGrade = 'A+' | 'A' | 'B' | 'C' | 'D' | 'F'
 
+// Entry for the full ticker universe (analyzed + unanalyzed)
+export interface TickerEntry {
+  ticker: string
+  company_name: string | null
+  industry: string | null
+  country: string | null
+  cap_size: string | null
+  currency: string | null
+  analyzed: boolean
+  // Only present if analyzed
+  current_price: number | null
+  market_cap: number | null
+  verdict: Verdict | null
+  quality_grade: QualityGrade | null
+  quality_score: number | null
+  margin_of_safety: number | null
+  has_margin_of_safety: boolean
+  buy_below_price: number | null
+  pad_mosee: number | null
+  dcf_mosee: number | null
+  book_mosee: number | null
+  confidence_level: string | null
+  confidence_score: number | null
+}
+
 // Lightweight stock summary for search and dashboard (no heavy JSON fields)
 export interface StockSummary {
   id: string

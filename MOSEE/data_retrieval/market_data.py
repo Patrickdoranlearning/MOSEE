@@ -79,6 +79,29 @@ from datetime import date, timedelta
 from forex_python.converter import CurrencyRates
 import freecurrencyapi
 
+
+def get_scuttlebutt_info(ticker: str) -> dict:
+    """
+    Extract qualitative / scuttlebutt data from yfinance ticker info.
+
+    Returns dict with employee_count, insider_held, institutional_held, beta,
+    shares_short_ratio, and forward_pe.  All values may be None.
+    """
+    try:
+        from MOSEE.data_retrieval.rate_limiter import get_ticker_info as rl_get_ticker_info
+        info = rl_get_ticker_info(ticker)
+    except Exception:
+        info = {}
+
+    return {
+        'employee_count': info.get('fullTimeEmployees'),
+        'insider_held': info.get('heldPercentInsiders'),
+        'institutional_held': info.get('heldPercentInstitutions'),
+        'beta': info.get('beta'),
+        'short_ratio': info.get('shortRatio'),
+        'forward_pe': info.get('forwardPE'),
+    }
+
 currency_api_key = os.environ.get('CURRENCY_API_KEY', '')
 
 

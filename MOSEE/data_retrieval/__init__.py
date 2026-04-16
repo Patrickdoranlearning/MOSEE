@@ -1,8 +1,9 @@
 """
 MOSEE Data Retrieval Module
 
-Handles downloading and processing financial data from yfinance.
+Handles downloading and processing financial data from yfinance and SEC EDGAR.
 Includes rate limiting utilities to handle Yahoo Finance API limits.
+SEC EDGAR provides 10-20 years of historical data for US companies (vs 4 from yfinance).
 """
 
 from .fundamental_data import (

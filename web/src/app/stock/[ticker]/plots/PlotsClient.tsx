@@ -136,10 +136,10 @@ function RevenueEarningsChart({ data }: { data: FinancialStatements['income_stat
 
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <BarChart data={merged} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+      <BarChart data={merged} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#6b7280' }} />
-        <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 12, fill: '#6b7280' }} />
+        <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#6b7280' }} angle={-45} textAnchor="end" height={50} />
+        <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 11, fill: '#6b7280' }} angle={-45} textAnchor="end" height={50} />
         <Tooltip content={<ChartTooltip />} />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
         <Bar dataKey="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
@@ -160,10 +160,10 @@ function MarginTrendsChart({ data }: { data: FinancialStatements['income_stateme
 
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <LineChart data={merged} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+      <LineChart data={merged} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#6b7280' }} />
-        <YAxis tickFormatter={formatPercentAxis} tick={{ fontSize: 12, fill: '#6b7280' }} />
+        <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#6b7280' }} angle={-45} textAnchor="end" height={50} />
+        <YAxis tickFormatter={formatPercentAxis} tick={{ fontSize: 11, fill: '#6b7280' }} angle={-45} textAnchor="end" height={50} />
         <Tooltip content={<PercentTooltip />} />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
         <Line type="monotone" dataKey="Gross Margin" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
@@ -184,10 +184,10 @@ function CashFlowChart({ data }: { data: FinancialStatements['cash_flow'] }) {
 
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <BarChart data={merged} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+      <BarChart data={merged} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#6b7280' }} />
-        <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 12, fill: '#6b7280' }} />
+        <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#6b7280' }} angle={-45} textAnchor="end" height={50} />
+        <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 11, fill: '#6b7280' }} angle={-45} textAnchor="end" height={50} />
         <Tooltip content={<ChartTooltip />} />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
         <ReferenceLine y={0} stroke="#9ca3af" />
@@ -209,10 +209,10 @@ function BalanceSheetChart({ data }: { data: FinancialStatements['balance_sheet'
 
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <AreaChart data={merged} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+      <AreaChart data={merged} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#6b7280' }} />
-        <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 12, fill: '#6b7280' }} />
+        <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#6b7280' }} angle={-45} textAnchor="end" height={50} />
+        <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 11, fill: '#6b7280' }} angle={-45} textAnchor="end" height={50} />
         <Tooltip content={<ChartTooltip />} />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
         <Area type="monotone" dataKey="Total Assets" stroke="#3b82f6" fill="#3b82f680" strokeWidth={2} />
@@ -234,10 +234,10 @@ function OwnerEarningsChart({ data }: { data: FinancialStatements['owner_earning
 
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <BarChart data={merged} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+      <BarChart data={merged} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#6b7280' }} />
-        <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 12, fill: '#6b7280' }} />
+        <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#6b7280' }} angle={-45} textAnchor="end" height={50} />
+        <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 11, fill: '#6b7280' }} angle={-45} textAnchor="end" height={50} />
         <Tooltip content={<ChartTooltip />} />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
         <ReferenceLine y={0} stroke="#9ca3af" />
@@ -401,8 +401,25 @@ export function PlotsClient({ stock }: PlotsClientProps) {
     )
   }
 
+  const yearsOfHistory = allMetrics.years_of_history as number | undefined
+  const dataSource = allMetrics.data_source as string | undefined
+
   return (
     <div className="space-y-6">
+      {/* Data coverage badge */}
+      {yearsOfHistory != null && (
+        <div className="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-lg px-4 py-2.5 text-sm">
+          <span className="font-semibold text-blue-900">
+            {yearsOfHistory} years of financial data
+          </span>
+          {dataSource && (
+            <span className="text-blue-600">
+              via {dataSource}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Revenue & Earnings */}
       {hasIncomeStatement && (
         <ChartCard

@@ -87,6 +87,17 @@ def run_on_demand(ticker: str) -> dict:
         if raw:
             db.save_raw_data(ticker, raw)
 
+            # Save to financial history warehouse (append-only, accumulates over time)
+            for stmt_type, stmt_key in [
+                ('income_statement', 'income_statement'),
+                ('balance_sheet', 'balance_sheet'),
+                ('cash_flow', 'cash_flow'),
+            ]:
+                stmt_data = raw.get(stmt_key, {})
+                if stmt_data and stmt_data.get('years'):
+                    currency = raw.get('currency_info', {}).get('reporting_currency', 'USD')
+                    db.save_financial_history(ticker, stmt_type, stmt_data, currency=currency)
+
         if not saved:
             log("Warning: Failed to save to database")
     except Exception as e:

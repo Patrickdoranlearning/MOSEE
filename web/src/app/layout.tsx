@@ -43,6 +43,12 @@ export default function RootLayout({
                     Home
                   </Link>
                   <Link
+                    href="/stocks"
+                    className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    Stocks
+                  </Link>
+                  <Link
                     href="/picks"
                     className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
                   >

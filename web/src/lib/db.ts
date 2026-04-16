@@ -6,7 +6,7 @@
  */
 
 import { sql } from '@vercel/postgres'
-import type { StockAnalysis, StockSummary, StockRawData } from '@/types/mosee'
+import type { StockAnalysis, StockSummary, StockRawData, RawFinancialStatement } from '@/types/mosee'
 
 /**
  * Convert PostgreSQL NUMERIC fields (returned as strings) to JavaScript numbers.
@@ -160,6 +160,75 @@ export async function getStockRawData(ticker: string): Promise<StockRawData | nu
   }
 
   return rows[0] as unknown as StockRawData
+}
+
+/**
+ * Get accumulated financial history from the warehouse.
+ * Returns all years for all 3 statement types, reconstructed in
+ * the same format as mosee_raw_data (line_items + years).
+ */
+export async function getFinancialHistory(ticker: string): Promise<{
+  income_statement: RawFinancialStatement
+  balance_sheet: RawFinancialStatement
+  cash_flow: RawFinancialStatement
+} | null> {
+  const { rows } = await sql`
+    SELECT statement_type, fiscal_year, data
+    FROM mosee_financial_history
+    WHERE UPPER(ticker) = UPPER(${ticker})
+    ORDER BY statement_type, fiscal_year ASC
+  `
+
+  if (rows.length === 0) {
+    return null
+  }
+
+  // Reconstruct {line_items, years} per statement type
+  const result: Record<string, { line_items: Record<string, Record<string, number | null>>; years: string[] }> = {}
+
+  for (const row of rows) {
+    const stmtType = row.statement_type as string
+    const year = String(row.fiscal_year)
+    const data = (row.data || {}) as Record<string, number | null>
+
+    if (!result[stmtType]) {
+      result[stmtType] = { line_items: {}, years: [] }
+    }
+    result[stmtType].years.push(year)
+
+    for (const [field, value] of Object.entries(data)) {
+      if (!result[stmtType].line_items[field]) {
+        result[stmtType].line_items[field] = {}
+      }
+      result[stmtType].line_items[field][year] = value
+    }
+  }
+
+  return {
+    income_statement: result['income_statement'] || { line_items: {}, years: [] },
+    balance_sheet: result['balance_sheet'] || { line_items: {}, years: [] },
+    cash_flow: result['cash_flow'] || { line_items: {}, years: [] },
+  }
+}
+
+/**
+ * Get stocks in the same industry for competitor comparison.
+ * Returns the latest analysis for each peer, excluding the given ticker.
+ */
+export async function getIndustryPeers(industry: string, excludeTicker: string): Promise<StockAnalysis[]> {
+  const { rows } = await sql`
+    SELECT * FROM (
+      SELECT DISTINCT ON (ticker) *
+      FROM mosee_stock_analyses
+      WHERE industry = ${industry}
+        AND UPPER(ticker) != UPPER(${excludeTicker})
+      ORDER BY ticker, analysis_date DESC
+    ) latest
+    ORDER BY quality_score DESC NULLS LAST
+    LIMIT 10
+  `
+
+  return rows.map(row => convertNumericFields(row as Record<string, unknown>))
 }
 
 /**

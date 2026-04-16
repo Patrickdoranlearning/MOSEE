@@ -66,16 +66,17 @@ def run_single_analysis(
     ticker: str,
     start_date: str,
     end_date: str,
-    ticker_info: Dict[str, Any]
+    ticker_info: Dict[str, Any],
+    db_client=None,
 ) -> Optional[Dict[str, Any]]:
     """
     Run MOSEE analysis on a single ticker with full intelligence.
-    
+
     Returns analysis data dictionary or None if analysis failed.
     """
     from MOSEE.data_retrieval.fundamental_data import (
         fundamental_downloads, net_income_expected,
-        balance_sheet_data_dic, dividends_expected_dic,
+        balance_sheet_data_dic, dividends_expected_dic, stock_buybacks_expected,
         income_statement_data_dic, cash_flow_data_dic,
         get_owners_earnings, get_invested_capital, get_shares_outstanding,
         dataframe_to_json
@@ -116,8 +117,8 @@ def run_single_analysis(
         if pd.isnull(current_price):
             return None
         
-        # Get fundamental data
-        fundamentals = fundamental_downloads(ticker)
+        # Get fundamental data (warehouse-first, then external APIs)
+        fundamentals = fundamental_downloads(ticker, db_client=db_client)
         cash_flow = fundamentals['cash_flow_statements']
         balance_sheet = fundamentals['balance_sheet_statements']
         income_statement = fundamentals['income_sheet_statements']
@@ -127,14 +128,49 @@ def run_single_analysis(
         if balance_sheet is None or balance_sheet.empty:
             return None
 
+        # ========== HISTORY METADATA ==========
+        income_years = len(income_statement.columns) if income_statement is not None and not income_statement.empty else 0
+        balance_years = len(balance_sheet.columns) if balance_sheet is not None and not balance_sheet.empty else 0
+        cashflow_years = len(cash_flow.columns) if cash_flow is not None and not cash_flow.empty else 0
+        max_years = max(income_years, balance_years, cashflow_years)
+        # Detect which extended source was used based on year count.
+        # yfinance alone caps at ~4 years; any more means an external source helped.
+        # The actual source is determined by the priority chain in fundamental_downloads():
+        #   1. Yahoo Timeseries (all stocks)  2. SEC EDGAR (US)  3. FMP (global, key needed)
+        if max_years > 5:
+            from MOSEE.data_retrieval.sec_edgar import resolve_cik
+            is_us = resolve_cik(ticker) is not None
+            data_source = "yfinance + SEC EDGAR" if is_us else "yfinance + Yahoo Extended"
+        else:
+            data_source = "yfinance"
+        print(f"    Data coverage: {max_years} years ({data_source})")
+
         # ========== CAPTURE RAW DATA (before currency conversion) ==========
         raw_balance_sheet = dataframe_to_json(balance_sheet)
         raw_income_statement = dataframe_to_json(income_statement)
         raw_cash_flow = dataframe_to_json(cash_flow)
 
+        # ========== SAVE TO FINANCIAL HISTORY WAREHOUSE ==========
+        # Stored in original reporting currency (before USD conversion).
+        # Append-only: historical years never overwritten, builds up over time.
+        reporting_currency = get_reporting_currency(ticker)
+        if db_client is not None:
+            wh_saved = 0
+            wh_saved += db_client.save_financial_history(
+                ticker, 'income_statement', raw_income_statement,
+                currency=reporting_currency, source=data_source)
+            wh_saved += db_client.save_financial_history(
+                ticker, 'balance_sheet', raw_balance_sheet,
+                currency=reporting_currency, source=data_source)
+            wh_saved += db_client.save_financial_history(
+                ticker, 'cash_flow', raw_cash_flow,
+                currency=reporting_currency, source=data_source)
+            if wh_saved > 0:
+                print(f"    [Warehouse] Saved {wh_saved} new year-records")
+
         # ========== CURRENCY CONVERSION ==========
         # Get reporting currency and convert all financial data to USD
-        reporting_currency = get_reporting_currency(ticker)
+        # (reporting_currency already fetched above for warehouse)
 
         # Get exchange rates (fetch once and reuse for efficiency)
         reporting_to_usd_rate = get_exchange_rate_to_usd(reporting_currency)
@@ -188,7 +224,8 @@ def run_single_analysis(
         net_income_dic = net_income_expected(cash_flow, 10, income_statement=income_statement)
         balance_sheet_dic = balance_sheet_data_dic(balance_sheet)
         dividends_dic = dividends_expected_dic(cash_flow)
-        
+        stock_buybacks_dic = stock_buybacks_expected(cash_flow)
+
         # Income statement metrics
         income_dic = {}
         if income_statement is not None and not income_statement.empty:
@@ -423,6 +460,15 @@ def run_single_analysis(
             'earnings_equity': earnings_equity,
             'market_cap': stock_cap,
             'net_income': net_income_dic.get('net_income_average', 0),
+            # History metadata — how much data backs the analysis
+            'years_of_history': max_years,
+            'data_source': data_source,
+            'income_years': income_years,
+            'balance_sheet_years': balance_years,
+            'cashflow_years': cashflow_years,
+            # Shareholder return metrics
+            'dividend_yield': dividends_dic.get('dividends_average', 0) / stock_cap if stock_cap > 0 else 0,
+            'buyback_yield': stock_buybacks_dic.get('buyback_average', 0) / stock_cap if stock_cap > 0 else 0,
         }
 
         # Add earnings data for visualization
@@ -501,6 +547,66 @@ def run_single_analysis(
         all_metrics['historical_earnings'] = historical_earnings
         all_metrics['pad_projections'] = pad_projections
         all_metrics['dcf_projections'] = dcf_projections
+
+        # ===== SHAREHOLDER RETURNS: Dividends & Share Capital =====
+        # Historical dividends paid (positive = cash returned to shareholders)
+        if 'dividends_df' in dividends_dic and isinstance(dividends_dic['dividends_df'], pd.Series):
+            div_series = dividends_dic['dividends_df'].dropna()
+            all_metrics['historical_dividends'] = []
+            for date_idx, val in div_series.items():
+                year = date_idx.year if hasattr(date_idx, 'year') else int(str(date_idx)[:4])
+                all_metrics['historical_dividends'].append({
+                    'year': int(year),
+                    'value': float(val) if not pd.isna(val) else 0
+                })
+        else:
+            all_metrics['historical_dividends'] = []
+
+        all_metrics['dividend_growth_rate'] = float(dividends_dic.get('dividend_average_growth', 0))
+
+        # Historical share repurchases and issuances (separate series for clarity)
+        # Repurchases: positive = money spent buying back shares
+        # Issuances: positive = money received from issuing shares
+        # Net buybacks: positive = net buyer (reducing shares), negative = net issuer (diluting)
+        repurchases_series = stock_buybacks_dic.get('stock_buybacks_df', pd.Series())
+        issuances_series = stock_buybacks_dic.get('stock_issued', pd.Series())
+
+        historical_repurchases = []
+        if isinstance(repurchases_series, pd.Series):
+            for date_idx, val in repurchases_series.dropna().items():
+                year = date_idx.year if hasattr(date_idx, 'year') else int(str(date_idx)[:4])
+                historical_repurchases.append({
+                    'year': int(year),
+                    'value': float(val) if not pd.isna(val) else 0
+                })
+        all_metrics['historical_net_buybacks'] = historical_repurchases
+
+        historical_issuances = []
+        if isinstance(issuances_series, pd.Series):
+            for date_idx, val in issuances_series.dropna().items():
+                year = date_idx.year if hasattr(date_idx, 'year') else int(str(date_idx)[:4])
+                historical_issuances.append({
+                    'year': int(year),
+                    'value': float(val) if not pd.isna(val) else 0
+                })
+        all_metrics['historical_issuances'] = historical_issuances
+
+        all_metrics['buyback_growth_rate'] = float(stock_buybacks_dic.get('buyback_average_growth', 0))
+
+        # Historical shares outstanding from balance sheet
+        historical_shares = []
+        if balance_sheet is not None and not balance_sheet.empty:
+            for name in ['Share Issued', 'Ordinary Shares Number', 'Common Stock Shares Outstanding']:
+                if name in balance_sheet.index:
+                    shares_series = balance_sheet.loc[name].dropna()
+                    for date_idx, val in shares_series.items():
+                        year = date_idx.year if hasattr(date_idx, 'year') else int(str(date_idx)[:4])
+                        historical_shares.append({
+                            'year': int(year),
+                            'value': float(val) if not pd.isna(val) else 0
+                        })
+                    break
+        all_metrics['historical_shares_outstanding'] = historical_shares
         all_metrics['net_income_average'] = float(net_income_avg) if not pd.isna(net_income_avg) else 0
         all_metrics['net_income_growth_rate'] = float(growth_rate) if not pd.isna(growth_rate) else 0
 
@@ -566,6 +672,30 @@ def run_single_analysis(
             },
         }
 
+        # ===== PRICE HISTORY FOR SNAPSHOT =====
+        # 52-week high/low from ticker info
+        all_metrics['fifty_two_week_high'] = ticker_info.get('fiftyTwoWeekHigh')
+        all_metrics['fifty_two_week_low'] = ticker_info.get('fiftyTwoWeekLow')
+
+        # 5-year monthly closing prices for sparkline chart
+        if stock_data is not None and not stock_data.empty:
+            close_col = stock_data['Close']
+            # Flatten MultiIndex columns if present (yfinance sometimes returns ticker-indexed columns)
+            if hasattr(close_col, 'columns'):
+                close_col = close_col.iloc[:, 0]
+            monthly = close_col.resample('ME').last().dropna()
+            price_history = []
+            for date_idx, val in monthly.items():
+                price_val = float(val.item()) if hasattr(val, 'item') else float(val)
+                if not pd.isna(price_val):
+                    price_history.append({
+                        'date': date_idx.strftime('%Y-%m'),
+                        'price': price_val
+                    })
+            all_metrics['price_history_monthly'] = price_history
+        else:
+            all_metrics['price_history_monthly'] = []
+
         # Generate intelligence report
         intel_report = generate_mosee_intelligence(
             ticker=ticker,
@@ -626,7 +756,8 @@ def run_analysis(
     cap_sizes: Optional[List[str]] = None,
     max_stocks: Optional[int] = None,
     skip_stocks: int = 0,
-    debug: bool = False
+    debug: bool = False,
+    db_client=None,
 ) -> List[Dict[str, Any]]:
     """
     Run MOSEE analysis on filtered stocks.
@@ -698,7 +829,7 @@ def run_analysis(
         print(f"  [{idx + 1}/{total}] Analyzing {ticker}...", end=" ")
         
         try:
-            result = run_single_analysis(ticker, start_date, end_date, ticker_info)
+            result = run_single_analysis(ticker, start_date, end_date, ticker_info, db_client=db_client)
             
             if result:
                 results.append(result)
@@ -801,7 +932,8 @@ def main():
             ticker_df,
             debug=debug_mode,
             max_stocks=max_stocks if not debug_mode else None,
-            skip_stocks=skip_stocks if not debug_mode else 0
+            skip_stocks=skip_stocks if not debug_mode else 0,
+            db_client=client,
         )
         
         print("")

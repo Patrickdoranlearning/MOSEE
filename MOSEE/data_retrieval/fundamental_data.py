@@ -11,6 +11,16 @@ from MOSEE.data_retrieval.rate_limiter import (
     get_ticker_object,
     with_rate_limit,
 )
+from MOSEE.data_retrieval.sec_edgar import (
+    get_extended_financials as edgar_get_extended_financials,
+    merge_with_yfinance,
+)
+from MOSEE.data_retrieval.fmp_client import (
+    get_extended_financials as fmp_get_extended_financials,
+)
+from MOSEE.data_retrieval.yahoo_timeseries import (
+    get_extended_financials as yahoo_ts_get_extended_financials,
+)
 
 
 # =============================================================================
@@ -75,7 +85,12 @@ def classify_earnings_pattern(
         }
 
     values = clean.values.astype(float)
-    mean_val = np.mean(values)
+    n = len(values)
+    # Exponential decay weights: newest year = 1.0, oldest = 0.8^(n-1)
+    decay = 0.8
+    weights = np.array([decay ** (n - 1 - i) for i in range(n)])
+
+    mean_val = float(np.average(values, weights=weights))
     std_val = np.std(values)
     negative_years = int(np.sum(values < 0))
     latest_positive = float(values[-1]) > 0
@@ -83,9 +98,11 @@ def classify_earnings_pattern(
     # Coefficient of variation (use absolute mean to handle mixed-sign earnings)
     cv = float(std_val / abs(mean_val)) if mean_val != 0 else float('inf')
 
-    # Normalized earnings: median of available years (mid-cycle proxy)
-    # Median is robust to outlier years in both directions (EXOR spike / PAH3.DE trough)
-    normalized_earnings = float(np.median(values))
+    # Normalized earnings: weighted average of recent years (mid-cycle proxy).
+    # With 20 years of data, a simple median lands on ~2016 values which
+    # badly underweights current earning power for growing companies.
+    # The weighted average uses the same decay as regression (0.8).
+    normalized_earnings = float(np.average(values, weights=weights))
 
     # Classification logic
     if negative_years > len(values) / 2:
@@ -112,7 +129,10 @@ def classify_earnings_pattern(
     latest_is_outlier = False
     latest_ratio = None
     if len(values) >= 3:
-        prior_median = float(np.median(values[:-1]))
+        # Use weighted average of prior years (not simple median) for outlier
+        # detection, so recent years anchor the comparison appropriately.
+        prior_weights = weights[:-1]
+        prior_median = float(np.average(values[:-1], weights=prior_weights))
         if prior_median > 0:
             latest_ratio = float(values[-1] / prior_median)
             if latest_ratio > 1.8 or latest_ratio < 0.55:
@@ -178,14 +198,53 @@ def dataframe_to_json(df: pd.DataFrame) -> dict:
     return {"line_items": line_items, "years": sorted(set(years))}
 
 
-def fundamental_downloads(ticker_temp):
+def json_to_dataframe(history_json: dict) -> pd.DataFrame:
     """
-    This function will download fundamental data using yfinance (FREE).
-    
-    Includes rate limiting and retry logic to handle Yahoo Finance rate limits.
+    Inverse of dataframe_to_json(). Reconstruct a pandas DataFrame from
+    warehouse JSON format.
+
+    Returns DataFrame with line items as index and Timestamp columns
+    (matching yfinance format).
+    """
+    if not history_json or not history_json.get('line_items'):
+        return pd.DataFrame()
+
+    line_items = history_json['line_items']
+    years = sorted(history_json.get('years', []))
+
+    if not years:
+        return pd.DataFrame()
+
+    # Build DataFrame: index=field_names, columns=Timestamps
+    datetime_cols = [pd.Timestamp(f"{y}-12-31") for y in years]
+    rows = {}
+    for field_name, year_values in line_items.items():
+        row = []
+        for y in years:
+            val = year_values.get(y)
+            row.append(float(val) if val is not None else np.nan)
+        rows[field_name] = row
+
+    df = pd.DataFrame.from_dict(rows, orient="index", columns=datetime_cols)
+    return df
+
+
+def fundamental_downloads(ticker_temp, use_extended_history=True, db_client=None):
+    """
+    This function will download fundamental data using yfinance and extends
+    it with historical data from the local warehouse and external APIs.
+
+    Data source priority:
+    1. Local warehouse (mosee_financial_history) — own accumulated data
+    2. yfinance (always fetched for latest year)
+    3. Yahoo Timeseries API (bypasses yfinance 4yr limit)
+    4. SEC EDGAR (US companies, free, no key)
+    5. FMP (global, free tier, needs API key)
 
     Args:
     - ticker_temp: the ticker of the security we are investigating
+    - use_extended_history: if True, fetch additional history beyond yfinance
+    - db_client: MOSEEDatabaseClient instance for warehouse access (optional)
 
     Returns:
     - fundamentals dictionary: of all fundamental data
@@ -193,21 +252,141 @@ def fundamental_downloads(ticker_temp):
 
     fundamentals = {}
 
-    # Use rate-limited function to get all financial statements
+    # ---- STEP 0: Check local warehouse first ----
+    warehouse_years = 0
+    if db_client is not None:
+        try:
+            stmt_map = {
+                'income_statement': 'income_sheet_statements',
+                'balance_sheet': 'balance_sheet_statements',
+                'cash_flow': 'cash_flow_statements',
+            }
+            warehouse_dfs = {}
+            for stmt_type, fund_key in stmt_map.items():
+                history = db_client.get_financial_history(ticker_temp, stmt_type)
+                if history and history.get('years'):
+                    warehouse_dfs[fund_key] = json_to_dataframe(history)
+                    warehouse_years = max(warehouse_years, len(history['years']))
+
+            if warehouse_years > 0:
+                print(f"  [Warehouse] {ticker_temp}: {warehouse_years} years in local history")
+        except Exception as e:
+            print(f"  [Warehouse] Error reading history for {ticker_temp}: {e}")
+            warehouse_dfs = {}
+
+    # ---- STEP 1: Always fetch fresh from yfinance (latest year) ----
+    # Use rate-limited function to get all financial statements from yfinance
     statements = get_financial_statements(ticker_temp)
-    
+
     balance_sheet_statements = statements.get('balance_sheet', pd.DataFrame())
     cash_flow_statements = statements.get('cashflow', pd.DataFrame())
     income_sheet_statements = statements.get('financials', pd.DataFrame())
 
-    # Transpose to match the expected format (items as index, dates as columns)
-    # and sort columns chronologically (oldest to newest)
+    # Sort columns chronologically (oldest to newest)
     if not balance_sheet_statements.empty:
         balance_sheet_statements = balance_sheet_statements.sort_index(axis=1)
     if not cash_flow_statements.empty:
         cash_flow_statements = cash_flow_statements.sort_index(axis=1)
     if not income_sheet_statements.empty:
         income_sheet_statements = income_sheet_statements.sort_index(axis=1)
+
+    yf_years = max(
+        len(balance_sheet_statements.columns) if not balance_sheet_statements.empty else 0,
+        len(cash_flow_statements.columns) if not cash_flow_statements.empty else 0,
+        len(income_sheet_statements.columns) if not income_sheet_statements.empty else 0,
+    )
+
+    # ---- STEP 2: Merge warehouse history with fresh yfinance data ----
+    # Warehouse provides older years; yfinance provides latest (freshest).
+    if warehouse_years > yf_years and db_client is not None:
+        warehouse_ext = {
+            'financials': warehouse_dfs.get('income_sheet_statements', pd.DataFrame()),
+            'balance_sheet': warehouse_dfs.get('balance_sheet_statements', pd.DataFrame()),
+            'cashflow': warehouse_dfs.get('cash_flow_statements', pd.DataFrame()),
+        }
+        yf_data = {
+            'financials': income_sheet_statements,
+            'balance_sheet': balance_sheet_statements,
+            'cashflow': cash_flow_statements,
+        }
+        merged = merge_with_yfinance(yf_data, warehouse_ext)
+        income_sheet_statements = merged.get('financials', income_sheet_statements)
+        balance_sheet_statements = merged.get('balance_sheet', balance_sheet_statements)
+        cash_flow_statements = merged.get('cashflow', cash_flow_statements)
+
+        merged_count = max(
+            len(income_sheet_statements.columns) if not income_sheet_statements.empty else 0,
+            len(balance_sheet_statements.columns) if not balance_sheet_statements.empty else 0,
+            len(cash_flow_statements.columns) if not cash_flow_statements.empty else 0,
+        )
+        print(f"  [Warehouse] {ticker_temp}: {yf_years} yfinance + {warehouse_years} warehouse = {merged_count} years")
+
+    # ---- STEP 3: If still < 10 years, try external APIs ----
+    # Priority:
+    #   1) Yahoo Timeseries API (all stocks — bypasses yfinance 4yr limit)
+    #   2) SEC EDGAR (US companies, free, no key, most fields)
+    #   3) FMP (global, free tier needs API key)
+    # Each source is tried only if the previous didn't add data.
+    extended_source = None
+
+    def _try_merge(ext_data, source_name):
+        """Attempt to merge extended data, return True if it added years."""
+        nonlocal income_sheet_statements, balance_sheet_statements, cash_flow_statements, extended_source
+        if ext_data is None:
+            return False
+        yf_data = {
+            'financials': income_sheet_statements,
+            'balance_sheet': balance_sheet_statements,
+            'cashflow': cash_flow_statements,
+        }
+        merged = merge_with_yfinance(yf_data, ext_data)
+        new_years = max(
+            len(merged.get('financials', pd.DataFrame()).columns),
+            len(merged.get('balance_sheet', pd.DataFrame()).columns),
+            len(merged.get('cashflow', pd.DataFrame()).columns),
+        )
+        if new_years > yf_years:
+            income_sheet_statements = merged.get('financials', income_sheet_statements)
+            balance_sheet_statements = merged.get('balance_sheet', balance_sheet_statements)
+            cash_flow_statements = merged.get('cashflow', cash_flow_statements)
+            extended_source = source_name
+            return True
+        return False
+
+    current_total_years = max(
+        len(income_sheet_statements.columns) if not income_sheet_statements.empty else 0,
+        len(balance_sheet_statements.columns) if not balance_sheet_statements.empty else 0,
+        len(cash_flow_statements.columns) if not cash_flow_statements.empty else 0,
+    )
+
+    if use_extended_history and current_total_years < 10:
+        # 1) Yahoo Timeseries — works for ALL stocks, bypasses yfinance's 4yr cap
+        try:
+            _try_merge(yahoo_ts_get_extended_financials(ticker_temp), "Yahoo Timeseries")
+        except Exception as e:
+            print(f"  [Extended History] Yahoo Timeseries failed for {ticker_temp}: {e}")
+
+        # 2) SEC EDGAR — US companies only, but has the most complete field coverage
+        if extended_source is None:
+            try:
+                _try_merge(edgar_get_extended_financials(ticker_temp), "SEC EDGAR")
+            except Exception as e:
+                print(f"  [Extended History] EDGAR failed for {ticker_temp}: {e}")
+
+        # 3) FMP — global coverage but needs API key and has free-tier limits
+        if extended_source is None:
+            try:
+                _try_merge(fmp_get_extended_financials(ticker_temp), "FMP")
+            except Exception as e:
+                print(f"  [Extended History] FMP failed for {ticker_temp}: {e}")
+
+        merged_years = max(
+            len(income_sheet_statements.columns) if not income_sheet_statements.empty else 0,
+            len(balance_sheet_statements.columns) if not balance_sheet_statements.empty else 0,
+            len(cash_flow_statements.columns) if not cash_flow_statements.empty else 0,
+        )
+        if merged_years > yf_years:
+            print(f"  [Extended History] {ticker_temp}: {yf_years} -> {merged_years} years via {extended_source}")
 
     fundamentals['balance_sheet_statements'] = balance_sheet_statements
     fundamentals['cash_flow_statements'] = cash_flow_statements
@@ -428,6 +607,21 @@ def income_statement_data_dic(income_statement):
         'Basic EPS',
         'Diluted EPS'
     ])
+
+    # Research & Development (Fisher - scuttlebutt)
+    research_development = _get_row_safe(income_statement, [
+        'Research And Development',
+        'Research Development',
+        'ResearchAndDevelopment',
+    ])
+
+    # Selling, General & Administrative (Fisher - operating leverage)
+    sga_expense = _get_row_safe(income_statement, [
+        'Selling General And Administration',
+        'Selling And Marketing Expense',
+        'General And Administrative Expense',
+        'Operating Expense',
+    ])
     
     # Calculate margins
     gross_margin = gross_profit / revenue if isinstance(revenue, pd.Series) and (revenue != 0).any() else pd.Series(0, index=revenue.index if hasattr(revenue, 'index') else [])
@@ -443,6 +637,11 @@ def income_statement_data_dic(income_statement):
     else:
         tax_rate = 0.25
     
+    # R&D intensity (R&D / Revenue) — scuttlebutt signal for innovation
+    rd_intensity = research_development / revenue if isinstance(revenue, pd.Series) and (revenue != 0).any() else pd.Series(0, index=revenue.index if hasattr(revenue, 'index') else [])
+    # SGA ratio (SGA / Revenue) — efficiency signal
+    sga_ratio = sga_expense / revenue if isinstance(revenue, pd.Series) and (revenue != 0).any() else pd.Series(0, index=revenue.index if hasattr(revenue, 'index') else [])
+
     income_data['revenue'] = revenue
     income_data['gross_profit'] = gross_profit
     income_data['ebit'] = ebit
@@ -454,6 +653,10 @@ def income_statement_data_dic(income_statement):
     income_data['operating_margin'] = operating_margin
     income_data['net_margin'] = net_margin
     income_data['tax_rate'] = tax_rate
+    income_data['research_development'] = research_development
+    income_data['sga_expense'] = sga_expense
+    income_data['rd_intensity'] = rd_intensity
+    income_data['sga_ratio'] = sga_ratio
     
     # Get latest values for convenience
     income_data['revenue_latest'] = revenue.iloc[-1] if isinstance(revenue, pd.Series) and len(revenue) > 0 else 0
@@ -605,15 +808,6 @@ def net_income_expected(cash_flow_statement, years_projection=10, decay_rate=0.8
         classification = earnings_classification['classification']
 
         if len(net_income_clean) > 1:  # Need at least 2 points for regression
-            # Trimmed mean: drop the single highest and lowest values to
-            # resist outlier years (e.g., one-off spikes or write-downs).
-            # With n<=2 we can't trim, so fall back to simple mean.
-            sorted_values = np.sort(net_income_clean.values)
-            if len(sorted_values) > 2:
-                net_income_average = float(np.mean(sorted_values[1:-1]))
-            else:
-                net_income_average = float(np.mean(sorted_values))
-
             numerical_years = list(range(len(net_income_clean)))
 
             # Prepare your data
@@ -623,14 +817,21 @@ def net_income_expected(cash_flow_statement, years_projection=10, decay_rate=0.8
             # Fit a linear regression model with more weight on recent years
             # Reverse index so newest year (last) gets weight 1.0, oldest gets decay^N
             n = len(y)
-            weights = [decay_rate ** (n - 1 - i) for i in range(n)]
+            weights = np.array([decay_rate ** (n - 1 - i) for i in range(n)])
             model = LinearRegression()
             model.fit(X, y, sample_weight=weights)
+
+            # WEIGHTED average — uses same decay weights as regression so that
+            # recent years count more. With 20 years of data, a simple mean
+            # gets dragged down by early low-earning years (e.g., AAPL 2007
+            # earned $3.5B vs $112B in 2025). The weighted average properly
+            # reflects current earning power.
+            net_income_average = float(np.average(y, weights=weights))
 
             # Calculate R² (regression fit quality)
             y_pred = model.predict(X)
             ss_res = np.sum(weights * (y - y_pred) ** 2)
-            ss_tot = np.sum(weights * (y - np.average(y, weights=weights)) ** 2)
+            ss_tot = np.sum(weights * (y - net_income_average) ** 2)
             r_squared = float(1 - ss_res / ss_tot) if ss_tot != 0 else 0.0
 
             net_income_average_growth = model.coef_[0] / net_income_average if net_income_average != 0 else 0
@@ -744,13 +945,16 @@ def dividends_expected_dic(cash_flow_statement, years_projection=10):
         dividends_clean = dividends_df.dropna()
         
         if len(dividends_clean) > 1:  # Need at least 2 points for regression
-            dividend_average = dividends_clean.values.mean()
+            y = dividends_clean.values
+            n = len(y)
+            # Weighted average — same decay as net income to weight recent years more
+            div_weights = np.array([0.8 ** (n - 1 - i) for i in range(n)])
+            dividend_average = float(np.average(y, weights=div_weights))
 
             numerical_years = list(range(len(dividends_clean)))
 
             # Prepare your data
             X = pd.DataFrame(numerical_years)
-            y = dividends_clean.values  # Dependent variable (dividends)
 
             # Fit a linear regression model
             model = LinearRegression()
@@ -822,16 +1026,18 @@ def stock_buybacks_expected(cash_flow_statement, years_projection=10, decay_rate
         buybacks_clean = stock_buybacks_df.dropna()
         
         if len(buybacks_clean) > 1:  # Need at least 2 points for regression
-            buyback_average = buybacks_clean.values.mean()
+            y = buybacks_clean.values
+            n = len(y)
+            # Weighted average — same decay as net income
+            bb_weights = np.array([0.8 ** (n - 1 - i) for i in range(n)])
+            buyback_average = float(np.average(y, weights=bb_weights))
 
             numerical_years = list(range(len(buybacks_clean)))
 
             # Prepare your data
             X = pd.DataFrame(numerical_years)
-            y = buybacks_clean.values  # Dependent variable (stock buybacks)
 
             # Fit a weighted linear regression model (more weight on recent years)
-            n = len(y)
             weights = [decay_rate ** (n - 1 - i) for i in range(n)]
             model = LinearRegression()
             model.fit(X, y, sample_weight=weights)

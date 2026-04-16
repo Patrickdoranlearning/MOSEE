@@ -104,6 +104,26 @@ export function ConfidenceBreakdown({ data, fallbackLevel, fallbackScore }: Conf
                 <div>
                   <div className="font-semibold text-gray-600 mb-1">Data Quality Details</div>
                   <div className="space-y-0.5">
+                    {dqDetails.years_of_data != null && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">History Depth</span>
+                        <span className={Number(dqDetails.years_of_data) >= 10 ? 'text-green-600 font-medium' : 'text-gray-700'}>
+                          {String(dqDetails.years_of_data)} years
+                        </span>
+                      </div>
+                    )}
+                    {dqDetails.history_depth_bonus != null && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">History Bonus</span>
+                        <span className="text-green-600">+{String(dqDetails.history_depth_bonus)} pts</span>
+                      </div>
+                    )}
+                    {dqDetails.history_depth_penalty != null && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">History Penalty</span>
+                        <span className="text-red-600">-{String(dqDetails.history_depth_penalty)} pts</span>
+                      </div>
+                    )}
                     {dqDetails.cash_flow_years != null && (
                       <div className="flex justify-between">
                         <span className="text-gray-500">Cash Flow Data</span>

@@ -123,17 +123,31 @@ def calculate_data_quality_score(
     else:
         details["has_current_price"] = False
 
-    # History depth penalty — projecting 10 years from <7 years of data
-    # is less reliable. Continuous penalty rather than a hard cutoff.
-    # Full score at 7+ years, linear ramp from 3 to 7.
-    IDEAL_YEARS = 7
+    # History depth scoring — projecting 10 years from limited data is less
+    # reliable. With SEC EDGAR we often get 10-20 years, covering full
+    # business cycles. Penalty below IDEAL, bonus above.
+    IDEAL_YEARS = 10
+    BONUS_THRESHOLD = 10  # bonus starts above this
+    MAX_BONUS = 5         # max bonus points for deep history
+    MAX_PENALTY = 15      # max penalty for shallow history
+
     years_available = 0
     if cash_flow_df is not None and not cash_flow_df.empty:
         years_available = len(cash_flow_df.columns) if hasattr(cash_flow_df, 'columns') else 0
+
+    details["years_of_data"] = years_available
+
     if years_available < IDEAL_YEARS:
-        history_penalty = (IDEAL_YEARS - years_available) / IDEAL_YEARS * 15
+        history_penalty = (IDEAL_YEARS - years_available) / IDEAL_YEARS * MAX_PENALTY
         score -= history_penalty
         details["history_depth_penalty"] = round(history_penalty, 1)
+    elif years_available > BONUS_THRESHOLD:
+        # Bonus for extended history — more data means better regression fit
+        # and more reliable earnings classification. Caps at MAX_BONUS.
+        extra_years = years_available - BONUS_THRESHOLD
+        history_bonus = min(MAX_BONUS, extra_years * 0.5)
+        score += history_bonus
+        details["history_depth_bonus"] = round(history_bonus, 1)
 
     return min(max(score, 0), max_score), details
 

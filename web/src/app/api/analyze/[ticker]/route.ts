@@ -14,7 +14,8 @@ function runAnalysis(ticker: string): Promise<{ status: string; ticker: string; 
     const projectRoot = path.resolve(process.cwd(), '..')
     const scriptPath = path.join(projectRoot, 'scripts', 'run_on_demand.py')
 
-    const proc = spawn('python', [scriptPath, ticker], {
+    const pythonPath = path.join(projectRoot, 'venv311', 'bin', 'python')
+    const proc = spawn(pythonPath, [scriptPath, ticker], {
       cwd: projectRoot,
       env: { ...process.env },
       timeout: 120_000,
