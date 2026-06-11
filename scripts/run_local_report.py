@@ -71,7 +71,7 @@ def run_single_analysis(
     """
     from MOSEE.data_retrieval.fundamental_data import (
         fundamental_downloads, net_income_expected,
-        balance_sheet_data_dic, dividends_expected_dic,
+        balance_sheet_data_dic, dividends_expected_dic, stock_buybacks_expected,
         income_statement_data_dic, cash_flow_data_dic,
         get_owners_earnings, get_invested_capital, get_shares_outstanding,
         dataframe_to_json
@@ -125,8 +125,9 @@ def run_single_analysis(
         industry = None
         sector = None
         country = None
+        ticker_info = {}
         try:
-            ticker_info = get_ticker_info(ticker)
+            ticker_info = get_ticker_info(ticker) or {}
             company_name = ticker_info.get('shortName') or ticker_info.get('longName') or ticker
             industry = ticker_info.get('industry')
             sector = ticker_info.get('sector')
@@ -217,6 +218,7 @@ def run_single_analysis(
         net_income_dic = net_income_expected(cash_flow, 10, income_statement=income_statement)
         balance_sheet_dic = balance_sheet_data_dic(balance_sheet)
         dividends_dic = dividends_expected_dic(cash_flow)
+        stock_buybacks_dic = stock_buybacks_expected(cash_flow)
 
         # Income statement metrics
         income_dic = {}
@@ -487,6 +489,8 @@ def run_single_analysis(
             'free_cash_flow': cf_dic.get('fcf_latest', 0),
             'shares_outstanding': shares_outstanding,
             'industry_pe': 15,
+            'dividend_yield': dividends_dic.get('dividends_average', 0) / stock_cap if stock_cap > 0 else 0,
+            'buyback_yield': stock_buybacks_dic.get('buyback_average', 0) / stock_cap if stock_cap > 0 else 0,
         }
 
         # Add earnings data for visualization
@@ -504,7 +508,7 @@ def run_single_analysis(
         # PAD projected earnings (compound growth from average)
         net_income_avg = net_income_dic.get('net_income_average', 0)
         growth_rate = net_income_dic.get('net_income_average_growth', 0)
-        current_year = 2025
+        current_year = datetime.now().year
         pad_projections = []
         # Scenario growth rates (flip direction for negative growth)
         if growth_rate >= 0:
@@ -543,8 +547,72 @@ def run_single_analysis(
         all_metrics['historical_earnings'] = historical_earnings
         all_metrics['pad_projections'] = pad_projections
         all_metrics['dcf_projections'] = dcf_projections
+
+        # ===== SHAREHOLDER RETURNS: Dividends & Share Capital =====
+        if 'dividends_df' in dividends_dic and isinstance(dividends_dic['dividends_df'], pd.Series):
+            div_series = dividends_dic['dividends_df'].dropna()
+            all_metrics['historical_dividends'] = []
+            for date_idx, val in div_series.items():
+                year = date_idx.year if hasattr(date_idx, 'year') else int(str(date_idx)[:4])
+                all_metrics['historical_dividends'].append({
+                    'year': int(year),
+                    'value': float(val) if not pd.isna(val) else 0
+                })
+        else:
+            all_metrics['historical_dividends'] = []
+
+        all_metrics['dividend_growth_rate'] = float(dividends_dic.get('dividend_average_growth', 0))
+
+        repurchases_series = stock_buybacks_dic.get('stock_buybacks_df', pd.Series())
+        issuances_series = stock_buybacks_dic.get('stock_issued', pd.Series())
+
+        historical_repurchases = []
+        if isinstance(repurchases_series, pd.Series):
+            for date_idx, val in repurchases_series.dropna().items():
+                year = date_idx.year if hasattr(date_idx, 'year') else int(str(date_idx)[:4])
+                historical_repurchases.append({
+                    'year': int(year),
+                    'value': float(val) if not pd.isna(val) else 0
+                })
+        all_metrics['historical_net_buybacks'] = historical_repurchases
+
+        historical_issuances = []
+        if isinstance(issuances_series, pd.Series):
+            for date_idx, val in issuances_series.dropna().items():
+                year = date_idx.year if hasattr(date_idx, 'year') else int(str(date_idx)[:4])
+                historical_issuances.append({
+                    'year': int(year),
+                    'value': float(val) if not pd.isna(val) else 0
+                })
+        all_metrics['historical_issuances'] = historical_issuances
+
+        all_metrics['buyback_growth_rate'] = float(stock_buybacks_dic.get('buyback_average_growth', 0))
+
+        historical_shares = []
+        if balance_sheet is not None and not balance_sheet.empty:
+            for name in ['Share Issued', 'Ordinary Shares Number', 'Common Stock Shares Outstanding']:
+                if name in balance_sheet.index:
+                    shares_series = balance_sheet.loc[name].dropna()
+                    for date_idx, val in shares_series.items():
+                        year = date_idx.year if hasattr(date_idx, 'year') else int(str(date_idx)[:4])
+                        historical_shares.append({
+                            'year': int(year),
+                            'value': float(val) if not pd.isna(val) else 0
+                        })
+                    break
+        all_metrics['historical_shares_outstanding'] = historical_shares
+
         all_metrics['net_income_average'] = float(net_income_avg) if not pd.isna(net_income_avg) else 0
         all_metrics['net_income_growth_rate'] = float(growth_rate) if not pd.isna(growth_rate) else 0
+
+        # Earnings classification and projection quality
+        earnings_cls = net_income_dic.get('earnings_classification', {})
+        all_metrics['earnings_classification'] = earnings_cls.get('classification', 'Unknown')
+        all_metrics['earnings_cv'] = earnings_cls.get('cv')
+        all_metrics['earnings_has_negative_years'] = earnings_cls.get('has_negative_years', False)
+        all_metrics['earnings_negative_year_count'] = earnings_cls.get('negative_year_count', 0)
+        all_metrics['projection_r_squared'] = net_income_dic.get('r_squared')
+        all_metrics['projection_method'] = net_income_dic.get('projection_method', 'flat')
 
         # Add critical metrics for earnings power check in verdict determination
         all_metrics['earnings_equity'] = earnings_equity
@@ -618,6 +686,27 @@ def run_single_analysis(
                 'formula': 'Net Income + Depreciation - Average CapEx',
             },
         }
+
+        # ===== PRICE HISTORY FOR SNAPSHOT =====
+        all_metrics['fifty_two_week_high'] = ticker_info.get('fiftyTwoWeekHigh')
+        all_metrics['fifty_two_week_low'] = ticker_info.get('fiftyTwoWeekLow')
+
+        if stock_data is not None and not stock_data.empty:
+            close_col = stock_data['Close']
+            if hasattr(close_col, 'columns'):
+                close_col = close_col.iloc[:, 0]
+            monthly = close_col.resample('ME').last().dropna()
+            price_history = []
+            for date_idx, val in monthly.items():
+                price_val = float(val.item()) if hasattr(val, 'item') else float(val)
+                if not pd.isna(price_val):
+                    price_history.append({
+                        'date': date_idx.strftime('%Y-%m'),
+                        'price': price_val
+                    })
+            all_metrics['price_history_monthly'] = price_history
+        else:
+            all_metrics['price_history_monthly'] = []
 
         # Generate intelligence report
         intel_report = generate_mosee_intelligence(

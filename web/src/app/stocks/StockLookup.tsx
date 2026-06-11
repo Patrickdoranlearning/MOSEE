@@ -26,11 +26,48 @@ function formatMOSEE(value: number | null | undefined): string {
   return value.toFixed(3)
 }
 
-function getMOSEEColor(value: number | null | undefined): string {
+// Conservative MOSEE = min of available method scores. Avoids the bug where
+// the most flattering method (e.g. PAD) displays green while the composite
+// verdict is REDUCE because Book / DCF disagree.
+function conservativeMOSEE(stock: {
+  pad_mosee: number | null
+  dcf_mosee: number | null
+  book_mosee: number | null
+}): number | null {
+  const vals = [stock.pad_mosee, stock.dcf_mosee, stock.book_mosee]
+    .filter((v): v is number => v != null && isFinite(v))
+  if (vals.length === 0) return null
+  return Math.min(...vals)
+}
+
+// Thresholds calibrated from the actual analyzed-universe distribution
+// (n=116, P50=0.012, P75=0.033, P90=0.067, P95=0.13).
+const MOSEE_GOOD = 0.07     // top decile
+const MOSEE_OK = 0.03       // top quartile
+const MOSEE_NEUTRAL = 0.012 // above median
+
+const BEARISH_VERDICTS: ReadonlySet<Verdict> = new Set([
+  'REDUCE', 'SELL', 'AVOID', 'WATCHLIST',
+])
+const LOW_QUALITY: ReadonlySet<QualityGrade> = new Set(['D', 'F'])
+
+function getMOSEEColor(
+  value: number | null | undefined,
+  verdict: Verdict | null,
+  quality: QualityGrade | null,
+): string {
   if (value == null || !isFinite(value)) return 'text-gray-300'
-  if (value >= 0.15) return 'text-green-600 font-medium'
-  if (value >= 0.10) return 'text-emerald-600'
-  if (value >= 0.05) return 'text-yellow-600'
+
+  // Quality / verdict gate: a stock the model dislikes should not glow green
+  // no matter how the multiplicative formula lands.
+  const disqualified =
+    (verdict && BEARISH_VERDICTS.has(verdict)) ||
+    (quality && LOW_QUALITY.has(quality))
+  if (disqualified) return 'text-gray-500'
+
+  if (value >= MOSEE_GOOD) return 'text-green-600 font-medium'
+  if (value >= MOSEE_OK) return 'text-emerald-600'
+  if (value >= MOSEE_NEUTRAL) return 'text-yellow-600'
   return 'text-orange-500'
 }
 
@@ -121,8 +158,8 @@ export function StockLookup({ stocks }: StockLookupProps) {
           comparison = (a.current_price || 0) - (b.current_price || 0)
           break
         case 'mosee': {
-          const ma = a.pad_mosee ?? a.dcf_mosee ?? a.book_mosee ?? -1
-          const mb = b.pad_mosee ?? b.dcf_mosee ?? b.book_mosee ?? -1
+          const ma = conservativeMOSEE(a) ?? -1
+          const mb = conservativeMOSEE(b) ?? -1
           comparison = ma - mb
           break
         }
@@ -298,7 +335,17 @@ export function StockLookup({ stocks }: StockLookupProps) {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {paginatedStocks.map((stock) => {
-                const moseeScore = stock.pad_mosee ?? stock.dcf_mosee ?? stock.book_mosee
+                const moseeScore = conservativeMOSEE(stock)
+                const moseeTitle =
+                  moseeScore == null
+                    ? undefined
+                    : `Conservative MOSEE (min of PAD/DCF/Book). ` +
+                      `Bands: ≥${MOSEE_GOOD} top decile · ≥${MOSEE_OK} top quartile · ` +
+                      `≥${MOSEE_NEUTRAL} above median.` +
+                      ((stock.verdict && BEARISH_VERDICTS.has(stock.verdict)) ||
+                      (stock.quality_grade && LOW_QUALITY.has(stock.quality_grade))
+                        ? ' Dimmed because verdict/quality is bearish.'
+                        : '')
                 const href = stock.analyzed
                   ? `/stock/${encodeURIComponent(stock.ticker)}`
                   : `/api/preview/${encodeURIComponent(stock.ticker)}`
@@ -332,7 +379,12 @@ export function StockLookup({ stocks }: StockLookupProps) {
                       {stock.current_price ? formatCurrency(stock.current_price) : <span className="text-gray-300">-</span>}
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-sm">
-                      <span className={getMOSEEColor(moseeScore)}>{formatMOSEE(moseeScore)}</span>
+                      <span
+                        className={getMOSEEColor(moseeScore, stock.verdict, stock.quality_grade)}
+                        title={moseeTitle}
+                      >
+                        {formatMOSEE(moseeScore)}
+                      </span>
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-sm">
                       {stock.analyzed ? (

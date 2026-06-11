@@ -1,5 +1,6 @@
 import { getAllAnalyses } from '@/lib/db'
 import { PicksFilter } from './PicksFilter'
+import { DeepDiveButton } from './DeepDiveButton'
 
 // Revalidate every hour (data updates weekly, not every 5 minutes)
 export const revalidate = 3600
@@ -33,6 +34,9 @@ export default async function PicksPage() {
           }
         </p>
       </div>
+
+      {/* Deep Dive trigger + status */}
+      <DeepDiveButton />
 
       {/* Error State */}
       {error && (

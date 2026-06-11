@@ -99,7 +99,7 @@ def run_single_analysis(
     from MOSEE.fundamental_analysis.growth_metrics import get_fisher_metrics
     from MOSEE.MOS import mos_dollar
     from MOSEE.confidence import calculate_confidence
-    from MOSEE.mosee_intelligence import generate_mosee_intelligence
+    from MOSEE.mosee_intelligence import generate_mosee_intelligence, compute_implied_annual_return
     
     try:
         # Get stock data
@@ -124,8 +124,15 @@ def run_single_analysis(
         income_statement = fundamentals['income_sheet_statements']
 
         if cash_flow is None or cash_flow.empty:
+            print(f"✗ Empty cash flow statement", end=" ")
             return None
         if balance_sheet is None or balance_sheet.empty:
+            print(f"✗ Empty balance sheet", end=" ")
+            return None
+        # An empty income statement otherwise produces a full row with zeroed
+        # earnings (EPS, revenue, margins all 0) — abort like the other statements.
+        if income_statement is None or income_statement.empty:
+            print(f"✗ Empty income statement", end=" ")
             return None
 
         # ========== HISTORY METADATA ==========
@@ -172,9 +179,19 @@ def run_single_analysis(
         # Get reporting currency and convert all financial data to USD
         # (reporting_currency already fetched above for warehouse)
 
-        # Get exchange rates (fetch once and reuse for efficiency)
-        reporting_to_usd_rate = get_exchange_rate_to_usd(reporting_currency)
-        trading_to_usd_rate = get_exchange_rate_to_usd(stock_currency)
+        # Get exchange rates (fetch once and reuse for efficiency).
+        # USD never needs a lookup. A None rate for a non-USD currency means the
+        # FX fetch failed — skip the ticker rather than convert with a fabricated
+        # 1.0 rate, which would corrupt every value in the row.
+        reporting_to_usd_rate = 1.0 if reporting_currency == 'USD' else get_exchange_rate_to_usd(reporting_currency)
+        trading_to_usd_rate = 1.0 if stock_currency == 'USD' else get_exchange_rate_to_usd(stock_currency)
+
+        if reporting_currency != 'USD' and reporting_to_usd_rate is None:
+            print(f"✗ No FX rate for reporting currency {reporting_currency}", end=" ")
+            return None
+        if stock_currency != 'USD' and trading_to_usd_rate is None:
+            print(f"✗ No FX rate for trading currency {stock_currency}", end=" ")
+            return None
 
         # Convert financial statements from reporting currency to USD
         if reporting_currency != 'USD':
@@ -292,18 +309,29 @@ def run_single_analysis(
         if 'dividends_df' in dividends_dic and isinstance(dividends_dic['dividends_df'], pd.Series):
             dividends_series = dividends_dic['dividends_df']
         
+        # Graham criterion 5 (10yr earnings growth) compares historical earnings
+        # against per-share eps_current. Pass a PER-SHARE net income series so the
+        # iloc[-10] lookup inside the criterion is also per-share — otherwise TOTAL
+        # net income is compared to per-share EPS and the test always fails for
+        # long-history stocks. Caveat: uses the CURRENT share count for old years.
+        # (Sign-invariant criterion 3 is unaffected by the constant division.)
+        if isinstance(net_income_series, pd.Series) and len(net_income_series) > 0 and shares_outstanding > 0:
+            net_income_per_share_series = net_income_series / shares_outstanding
+        else:
+            net_income_per_share_series = net_income_series
+
         # Use actual historical EPS if available, otherwise mark as unavailable
         if isinstance(net_income_series, pd.Series) and len(net_income_series) >= 3 and shares_outstanding > 0:
             eps_10yr_ago = float(net_income_series.iloc[0]) / shares_outstanding
         else:
             eps_10yr_ago = 0  # Unknown — Graham criterion will fail honestly
-        
+
         graham_criteria = calculate_graham_defensive_criteria(
             revenue=revenue,
             current_assets=current_assets_latest,
             current_liabilities=current_liabilities_latest,
             long_term_debt=long_term_debt_latest,
-            net_income_history=net_income_series,
+            net_income_history=net_income_per_share_series,
             dividends_history=dividends_series,
             eps_current=eps,
             eps_10yr_ago=eps_10yr_ago,
@@ -328,8 +356,10 @@ def run_single_analysis(
         roic = calculate_roic(nopat, invested_capital) if invested_capital > 0 else 0
         
         total_debt_latest = balance_sheet_dic['total_debt'].iloc[-1] if hasattr(balance_sheet_dic['total_debt'], 'iloc') else 0
-        interest_expense = income_dic.get('interest_expense_latest', 0)
-        
+        # None (not 0) when absent: a missing interest expense is unknown, not
+        # "no debt" — defaulting to 0 falsely awarded max interest-coverage points.
+        interest_expense = income_dic.get('interest_expense_latest', None)
+
         debt_to_equity = calculate_debt_to_equity(total_debt_latest, stockholders_equity)
         interest_coverage = calculate_interest_coverage(ebit, interest_expense)
         
@@ -338,10 +368,10 @@ def run_single_analysis(
         owner_earnings_yield = owner_earnings_latest / stock_cap if stock_cap > 0 else 0
         
         # Lynch Metrics
+        # Keep earnings_growth as-is (0 stays 0). Imputing a phantom 5% growth
+        # for data-poor stocks doubles fair value in the owner-earnings perpetuity.
         earnings_growth = net_income_dic.get('net_income_average_growth', 0)
-        if earnings_growth == 0:
-            earnings_growth = 0.05
-        
+
         cash_on_hand = balance_sheet_dic.get('cash_onhand', 0)
         
         lynch_metrics = get_lynch_metrics(
@@ -394,19 +424,21 @@ def run_single_analysis(
         growth_quality_score = fisher_metrics.growth_quality_score
         
         # MoS Calculations
-        market_mos = mos_dollar(current_price, market_average_value) if market_average_value != 0 else 0
-        pad_mos = mos_dollar(stock_cap, pad_value) if pad_value != 0 else 0
-        dcf_mos = mos_dollar(stock_cap, dcf_value) if dcf_value != 0 else 0
-        pad_dividend_mos = mos_dollar(stock_cap, pad_dividend_valuation) if pad_dividend_valuation != 0 else 0
-        book_mos = mos_dollar(stock_cap, book_valuation) if book_valuation != 0 else 0
-        
+        # mos_dollar returns None when the value marker is NaN/Inf/<=0 — that
+        # method's MoS/MOSEE is then stored as None (unknown), not a poison NaN.
+        market_mos = mos_dollar(current_price, market_average_value)
+        pad_mos = mos_dollar(stock_cap, pad_value)
+        dcf_mos = mos_dollar(stock_cap, dcf_value)
+        pad_dividend_mos = mos_dollar(stock_cap, pad_dividend_valuation)
+        book_mos = mos_dollar(stock_cap, book_valuation)
+
         # MOSEE calculations — per-method, not blanket zeroing
         # MOSEE = earnings_equity × (1/MoS). Only valid when both MoS > 0 and earnings_equity > 0.
-        # When MoS is negative (intrinsic value is negative), or earnings are negative,
-        # that method's MOSEE is 0 — but other methods may still be valid.
+        # When MoS is None/negative (intrinsic value unknown or negative), or earnings
+        # are negative, that method's MOSEE is None — but other methods may still be valid.
         def _calc_mosee(mos_val, ee):
-            if mos_val <= 0 or ee <= 0:
-                return 0
+            if mos_val is None or ee is None or mos_val <= 0 or ee <= 0:
+                return None
             return ee * (1 / mos_val)
 
         market_MOSEE = _calc_mosee(market_mos, earnings_equity)
@@ -713,7 +745,13 @@ def run_single_analysis(
         all_metrics['recommendation_text'] = intel_report.recommendation
         all_metrics['confidence_breakdown'] = confidence.to_dict()
 
+        # Implied annualised return (composite_base convergence over 5yr + clamped
+        # dividend yield). None when guardrails fail — never a fabricated number.
+        implied_annual_return = compute_implied_annual_return(intel_report, all_metrics)
+        all_metrics['implied_annual_return'] = implied_annual_return
+
         return {
+            'implied_annual_return': implied_annual_return,
             'Ticker Symbol': ticker,
             'company_name': ticker_info.get('name'),
             'industry': ticker_info.get('industry'),
@@ -758,6 +796,7 @@ def run_analysis(
     skip_stocks: int = 0,
     debug: bool = False,
     db_client=None,
+    run_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Run MOSEE analysis on filtered stocks.
@@ -807,17 +846,22 @@ def run_analysis(
             filtered_df = filtered_df.head(max_stocks)
     
     print(f"  Analyzing {len(filtered_df)} stocks...")
-    
+
     # Date range
     start_date = "2020-01-01"
     end_date = datetime.now().strftime("%Y-%m-%d")
-    
+
     results = []
+    saved_count = 0
     total = len(filtered_df)
-    
+
+    # Seed total_stocks so the UI can show a denominator immediately.
+    if run_id and db_client and total:
+        db_client.update_run_progress(run_id, current_index=0, total_stocks=total, current_ticker=None)
+
     for idx, (_, row) in enumerate(filtered_df.iterrows()):
         ticker = row['ticker']
-        
+
         ticker_info = {
             'name': row.get('name'),
             'country': row.get('country'),
@@ -825,22 +869,42 @@ def run_analysis(
             'cap': row.get('cap'),
             'currency': row.get('currency'),
         }
-        
+
         print(f"  [{idx + 1}/{total}] Analyzing {ticker}...", end=" ")
-        
+
+        if run_id and db_client:
+            db_client.update_run_progress(
+                run_id,
+                current_index=idx + 1,
+                total_stocks=total,
+                current_ticker=ticker,
+            )
+
         try:
             result = run_single_analysis(ticker, start_date, end_date, ticker_info, db_client=db_client)
-            
+
             if result:
-                results.append(result)
                 verdict = result.get('intelligence_report', {}).get('verdict', 'N/A')
+
+                # Persist immediately so a crash mid-run (these runs span hours)
+                # doesn't lose everything. The (ticker, analysis_date) upsert is
+                # idempotent. raw_data is large — save it, then drop it from the
+                # retained dict so the in-memory list can't OOM a long run.
+                if db_client and run_id:
+                    if db_client.save_analysis_result(run_id, result):
+                        saved_count += 1
+                    raw = result.pop('raw_data', None)
+                    if raw:
+                        db_client.save_raw_data(ticker, raw)
+
+                results.append(result)
                 print(f"✓ {verdict}")
             else:
                 print("✗ No data")
         except Exception as e:
             print(f"✗ Error: {e}")
-    
-    return results
+
+    return results, saved_count
 
 
 def clear_all_data(client: MOSEEDatabaseClient):
@@ -878,14 +942,28 @@ def main():
     debug_mode = os.environ.get("MOSEE_DEBUG", "0") == "1"
     clear_data = "--clear" in sys.argv
 
+    # Full-market deep-dive: MOSEE_FULL=1 disables the per-batch cap.
+    full_market = os.environ.get("MOSEE_FULL", "0") == "1"
+
     # Batch processing: MOSEE_SKIP=100 MOSEE_LIMIT=100 runs stocks 101-200
     skip_stocks = int(os.environ.get("MOSEE_SKIP", "0"))
-    max_stocks = int(os.environ.get("MOSEE_LIMIT", "100"))
+    max_stocks: Optional[int] = None if full_market else int(os.environ.get("MOSEE_LIMIT", "100"))
+
+    # Run-id + trigger metadata supplied by the API route (or the cron job).
+    preassigned_run_id = os.environ.get("MOSEE_RUN_ID") or None
+    run_kind = os.environ.get("MOSEE_RUN_KIND", "scheduled")  # 'manual' | 'scheduled'
+    triggered_by = os.environ.get("MOSEE_TRIGGERED_BY") or None
 
     print(f"Starting MOSEE Weekly Analysis - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print(f"  Debug mode: {'ON' if debug_mode else 'OFF'}")
+    print(f"  Full market: {'ON' if full_market else 'OFF'}")
     print(f"  Clear data: {'YES' if clear_data else 'NO'}")
-    print(f"  Skip: {skip_stocks}, Limit: {max_stocks} (stocks {skip_stocks + 1}-{skip_stocks + max_stocks})")
+    if full_market:
+        print(f"  Skip: {skip_stocks}, Limit: ALL (full-market deep-dive)")
+    else:
+        print(f"  Skip: {skip_stocks}, Limit: {max_stocks} (stocks {skip_stocks + 1}-{skip_stocks + max_stocks})")
+    if preassigned_run_id:
+        print(f"  Claiming pre-assigned run: {preassigned_run_id} ({run_kind})")
     print("")
 
     # Initialize database tables
@@ -912,55 +990,48 @@ def main():
         print("Clearing existing data...")
         clear_all_data(client)
 
-    # Start analysis run
+    # Start analysis run (claim a pre-assigned id if the API handed us one).
     print("")
     print("Starting analysis run...")
-    run_id = client.start_analysis_run()
-    print(f"  ✓ Created run: {run_id}")
-    
+    run_id = client.start_analysis_run(
+        run_id=preassigned_run_id,
+        kind=run_kind,
+        triggered_by=triggered_by,
+        scope={
+            "full_market": full_market,
+            "debug": debug_mode,
+            "skip": skip_stocks,
+            "limit": max_stocks,
+        },
+    )
+    print(f"  ✓ Run id: {run_id}")
+
     try:
         # Load ticker data
         print("")
         print("Loading ticker data...")
         ticker_df = load_ticker_data()
         print(f"  ✓ Loaded {len(ticker_df)} tickers")
-        
-        # Run analysis
+
+        # Run analysis. Each ticker is now persisted incrementally inside the
+        # loop (analysis + raw data) so a crash during these multi-hour runs
+        # doesn't lose completed work. saved_count is the count of successful
+        # incremental saves; raw_data has already been written and dropped.
         print("")
         print("Running analysis...")
-        results = run_analysis(
+        results, saved_count = run_analysis(
             ticker_df,
             debug=debug_mode,
             max_stocks=max_stocks if not debug_mode else None,
             skip_stocks=skip_stocks if not debug_mode else 0,
             db_client=client,
+            run_id=run_id,
         )
-        
+
         print("")
         print(f"Analysis complete: {len(results)} stocks analyzed successfully")
-        
-        # Save results to Supabase
-        print("")
-        print("Saving results to Supabase...")
-        
-        def progress_callback(current, total):
-            print(f"  Saving: {current}/{total}", end="\r")
-        
-        saved_count = client.save_batch_results(run_id, results, progress_callback)
-        print(f"  ✓ Saved {saved_count} results to Supabase")
+        print(f"  ✓ Saved {saved_count} results to Supabase (incremental)")
 
-        # Save raw data for data transparency
-        print("")
-        print("Saving raw data...")
-        raw_saved = 0
-        for r in results:
-            ticker = r.get('Ticker Symbol', r.get('ticker'))
-            raw = r.get('raw_data')
-            if ticker and raw:
-                if client.save_raw_data(ticker, raw):
-                    raw_saved += 1
-        print(f"  ✓ Saved raw data for {raw_saved} stocks")
-        
         # Complete the run
         client.complete_analysis_run(run_id, saved_count)
         print("")

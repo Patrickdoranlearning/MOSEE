@@ -117,6 +117,40 @@ def init_database():
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
     """)
+
+    # Additive columns for progress tracking + trigger metadata.
+    # Wrapped so an older deployment migrates forward without losing data.
+    for col, ddl in [
+        ("kind", "ALTER TABLE mosee_analysis_runs ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'scheduled'"),
+        ("triggered_by", "ALTER TABLE mosee_analysis_runs ADD COLUMN IF NOT EXISTS triggered_by TEXT"),
+        ("total_stocks", "ALTER TABLE mosee_analysis_runs ADD COLUMN IF NOT EXISTS total_stocks INTEGER NOT NULL DEFAULT 0"),
+        ("current_index", "ALTER TABLE mosee_analysis_runs ADD COLUMN IF NOT EXISTS current_index INTEGER NOT NULL DEFAULT 0"),
+        ("current_ticker", "ALTER TABLE mosee_analysis_runs ADD COLUMN IF NOT EXISTS current_ticker TEXT"),
+        ("started_at", "ALTER TABLE mosee_analysis_runs ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ"),
+        ("finished_at", "ALTER TABLE mosee_analysis_runs ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ"),
+        ("scope", "ALTER TABLE mosee_analysis_runs ADD COLUMN IF NOT EXISTS scope JSONB DEFAULT '{}'::jsonb"),
+    ]:
+        cur.execute(ddl)
+
+    # Widen the status CHECK to include 'pending' (API row created before the
+    # workflow boots). Drop-and-recreate is the simplest portable form.
+    cur.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conrelid = 'mosee_analysis_runs'::regclass
+                  AND conname = 'mosee_analysis_runs_status_check'
+            ) THEN
+                ALTER TABLE mosee_analysis_runs DROP CONSTRAINT mosee_analysis_runs_status_check;
+            END IF;
+        END $$;
+    """)
+    cur.execute("""
+        ALTER TABLE mosee_analysis_runs
+        ADD CONSTRAINT mosee_analysis_runs_status_check
+        CHECK (status IN ('pending', 'running', 'completed', 'failed'))
+    """)
     
     # Create stock analyses table
     cur.execute("""
@@ -157,11 +191,20 @@ def init_database():
             book_mosee NUMERIC,
             confidence_level TEXT,
             confidence_score NUMERIC,
+            implied_annual_return NUMERIC,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             UNIQUE(ticker, analysis_date)
         )
     """)
+
+    # Additive columns for mosee_stock_analyses. The prod table already exists,
+    # so a CREATE-only path won't migrate it — follow the same ADD COLUMN IF NOT
+    # EXISTS loop the runs table uses above.
+    for col, ddl in [
+        ("implied_annual_return", "ALTER TABLE mosee_stock_analyses ADD COLUMN IF NOT EXISTS implied_annual_return NUMERIC"),
+    ]:
+        cur.execute(ddl)
     
     # Create indexes
     cur.execute("CREATE INDEX IF NOT EXISTS idx_mosee_analyses_ticker ON mosee_stock_analyses(ticker)")
@@ -473,46 +516,115 @@ class MOSEEDatabaseClient:
         if self.conn and not self.conn.closed:
             self.conn.close()
     
-    def start_analysis_run(self) -> str:
+    def start_analysis_run(
+        self,
+        run_id: Optional[str] = None,
+        kind: str = "scheduled",
+        triggered_by: Optional[str] = None,
+        scope: Optional[Dict[str, Any]] = None,
+    ) -> str:
         """
-        Create a new analysis run record.
-        
-        Returns:
-            The ID of the created run.
+        Create a new analysis run record, or claim an existing pre-created one
+        (the API route inserts a 'pending' row before dispatching the workflow,
+        and the script claims it when it boots so the UI shows continuity).
         """
         conn = self._get_conn()
         cur = conn.cursor()
-        
-        cur.execute("""
-            INSERT INTO mosee_analysis_runs (status, stocks_analyzed)
-            VALUES ('running', 0)
-            RETURNING id
-        """)
-        
-        result = cur.fetchone()
+
+        scope_json = json.dumps(scope or {})
+
+        if run_id:
+            # Claim a pre-created run row — flip it to 'running' and stamp started_at.
+            cur.execute(
+                """
+                UPDATE mosee_analysis_runs
+                SET status = 'running',
+                    started_at = COALESCE(started_at, now()),
+                    kind = COALESCE(NULLIF(%s, ''), kind),
+                    triggered_by = COALESCE(triggered_by, %s),
+                    scope = COALESCE(scope, '{}'::jsonb) || %s::jsonb
+                WHERE id = %s
+                RETURNING id
+                """,
+                (kind, triggered_by, scope_json, run_id),
+            )
+            row = cur.fetchone()
+            if not row:
+                # Row did not exist — fall through and create one with the given id.
+                cur.execute(
+                    """
+                    INSERT INTO mosee_analysis_runs
+                        (id, status, stocks_analyzed, kind, triggered_by, started_at, scope)
+                    VALUES (%s, 'running', 0, %s, %s, now(), %s::jsonb)
+                    RETURNING id
+                    """,
+                    (run_id, kind, triggered_by, scope_json),
+                )
+                row = cur.fetchone()
+        else:
+            cur.execute(
+                """
+                INSERT INTO mosee_analysis_runs
+                    (status, stocks_analyzed, kind, triggered_by, started_at, scope)
+                VALUES ('running', 0, %s, %s, now(), %s::jsonb)
+                RETURNING id
+                """,
+                (kind, triggered_by, scope_json),
+            )
+            row = cur.fetchone()
+
         conn.commit()
         cur.close()
-        
-        return str(result['id'])
-    
+        return str(row['id'])
+
+    def update_run_progress(
+        self,
+        run_id: str,
+        current_index: int,
+        total_stocks: int,
+        current_ticker: Optional[str] = None,
+    ):
+        """Write incremental progress so the UI can show '423/7049 ✦ AAPL'."""
+        try:
+            conn = self._get_conn()
+            cur = conn.cursor()
+            cur.execute(
+                """
+                UPDATE mosee_analysis_runs
+                SET current_index = %s,
+                    total_stocks = GREATEST(total_stocks, %s),
+                    current_ticker = %s
+                WHERE id = %s
+                """,
+                (current_index, total_stocks, current_ticker, run_id),
+            )
+            conn.commit()
+            cur.close()
+        except Exception as e:
+            # Progress writes must never crash the analysis loop.
+            print(f"  [warn] progress update failed: {e}")
+
     def complete_analysis_run(
-        self, 
-        run_id: str, 
-        stocks_analyzed: int, 
+        self,
+        run_id: str,
+        stocks_analyzed: int,
         error_message: Optional[str] = None
     ):
         """Mark an analysis run as completed or failed."""
         conn = self._get_conn()
         cur = conn.cursor()
-        
+
         status = "failed" if error_message else "completed"
-        
+
         cur.execute("""
-            UPDATE mosee_analysis_runs 
-            SET status = %s, stocks_analyzed = %s, error_message = %s
+            UPDATE mosee_analysis_runs
+            SET status = %s,
+                stocks_analyzed = %s,
+                error_message = %s,
+                finished_at = now()
             WHERE id = %s
         """, (status, stocks_analyzed, error_message, run_id))
-        
+
         conn.commit()
         cur.close()
     
@@ -567,7 +679,7 @@ class MOSEEDatabaseClient:
                     buy_below_price, valuation_conservative, valuation_base, valuation_optimistic,
                     valuation_confidence, perspectives, strengths, concerns, action_items,
                     all_metrics, pad_mos, dcf_mos, book_mos, pad_mosee, dcf_mosee, book_mosee,
-                    confidence_level, confidence_score
+                    confidence_level, confidence_score, implied_annual_return
                 ) VALUES (
                     %s, %s, %s, %s, %s, %s,
                     CURRENT_DATE, %s, %s, %s,
@@ -575,11 +687,14 @@ class MOSEEDatabaseClient:
                     %s, %s, %s, %s,
                     %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s
+                    %s, %s, %s
                 )
                 ON CONFLICT (ticker, analysis_date) DO UPDATE SET
                     run_id = EXCLUDED.run_id,
                     company_name = EXCLUDED.company_name,
+                    industry = EXCLUDED.industry,
+                    country = EXCLUDED.country,
+                    cap_size = EXCLUDED.cap_size,
                     current_price = EXCLUDED.current_price,
                     market_cap = EXCLUDED.market_cap,
                     verdict = EXCLUDED.verdict,
@@ -591,6 +706,7 @@ class MOSEEDatabaseClient:
                     valuation_conservative = EXCLUDED.valuation_conservative,
                     valuation_base = EXCLUDED.valuation_base,
                     valuation_optimistic = EXCLUDED.valuation_optimistic,
+                    valuation_confidence = EXCLUDED.valuation_confidence,
                     perspectives = EXCLUDED.perspectives,
                     strengths = EXCLUDED.strengths,
                     concerns = EXCLUDED.concerns,
@@ -604,6 +720,7 @@ class MOSEEDatabaseClient:
                     book_mosee = EXCLUDED.book_mosee,
                     confidence_level = EXCLUDED.confidence_level,
                     confidence_score = EXCLUDED.confidence_score,
+                    implied_annual_return = EXCLUDED.implied_annual_return,
                     updated_at = now()
             """, (
                 run_id,
@@ -637,6 +754,7 @@ class MOSEEDatabaseClient:
                 convert_numpy_types(result.get("Book MOSEE")),
                 result.get("confidence", {}).get("level"),
                 convert_numpy_types(result.get("confidence", {}).get("score")),
+                convert_numpy_types(result.get("implied_annual_return")),
             ))
             
             conn.commit()
