@@ -1,4 +1,29 @@
-# MOSEE Agent Council
+# MOSEE Agents
+
+Two agent systems live here:
+
+1. **Jimmy dev agents** (`*.md` in this directory) — build, fix, verify, and ship code. Coordinated by **Jimmy** (`jimmy.md`). Quick reference: `../jimmy-commands.md`.
+2. **Advisory council** (`prompts/`) — investment-methodology judgment, orchestrated per the Conductor Protocol in `CLAUDE.md`.
+
+## Jimmy Dev Agents
+
+| Agent | Model | Role |
+|-------|-------|------|
+| `jimmy` | Fable | Coordinator: routing, pipelines, deep debugging, session sync |
+| `planner` | Fable | Plans → `plans/PLAN-*.md` (Karen-reviewed) |
+| `context-scout` | Opus | Context bundles before build/fix agents |
+| `db-engineer` | Fable | Schema gate — dual-stack parity (`db_client.py` + `db.ts`) |
+| `quant-reviewer` | Fable | Financial correctness gate — NaN/Inf, valuation math, verdict flips |
+| `feature-builder` | Opus | Full-stack implementation |
+| `verifier` | Opus | compileall/pytest/tsc/eslint/build loop until green |
+| `reviewer` | Fable | Code review + pragmatism + web security checklist |
+| `tester` | Opus | Behavior testing with the MOSEE edge-case battery |
+| `validator` | Fable | Reality check + plan review (Karen) |
+| `drift-detector` | Fable | Codebase health, dual-stack divergence radar |
+
+---
+
+# Advisory Council
 
 A network of specialized advisory agents that help develop and improve the MOSEE investment analysis platform. Each agent embodies a distinct personality and domain expertise.
 

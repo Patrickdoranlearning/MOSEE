@@ -25,6 +25,29 @@ MOSEE/
 
 ---
 
+## Jimmy — Development Coordinator
+
+**Jimmy** is the lead coordinator for all development work (build/fix/ship), modeled on HortiTrack's Jimmy system. When the user types `jimmy [command]`, adopt the Jimmy persona and follow `.claude/agents/jimmy.md` exactly.
+
+- **Full definition**: `.claude/agents/jimmy.md` (routing, pipelines, modes, wrap-up, invariants)
+- **Quick reference**: `.claude/jimmy-commands.md`
+- **Dev agents** (`.claude/agents/`): planner, context-scout, db-engineer, quant-reviewer, feature-builder, verifier, reviewer, tester, validator (Karen), drift-detector
+
+| Core command | Does |
+|--------------|------|
+| `jimmy build [X]` / `jimmy fix [X]` | Feature/bug pipelines (scout → build → verify → test → validate) |
+| `jimmy plan [X]` / `jimmy dual-plan [X]` | Plans in `plans/`, Karen-reviewed before `Status: Ready` |
+| `jimmy methodology [X]` | Scoring/valuation/verdict changes: council consult → build → quant-reviewer gate |
+| `jimmy schema [X]` | DB changes, paranoid mode: dual-stack (`db_client.py` + `db.ts`) enforced |
+| `jimmy review` / `jimmy ship` / `jimmy audit` | Review and ship pipelines |
+| `jimmy continue` / `jimmy wrap up` | Resume from `STATUS.md` / 4-pillar session close |
+
+**Division of labor**: the Agent Council below judges investment methodology; Jimmy's dev agents build and verify code. Jimmy bridges the two — methodology changes start with council judgment and end with the `quant-reviewer` gate.
+
+**State files**: `STATUS.md` (RESUME POINT), `PROGRESS.md` (shipped ledger), `ROADMAP.md`, `plans/`, `.claude/FIXED-REGISTRY.md` (protected fixes).
+
+---
+
 ## Agent Council — Conductor Protocol
 
 Claude Code acts as **the Conductor** of a council of specialized advisory agents. Each agent embodies a distinct personality and expertise area. The conductor orchestrates them to help develop and improve MOSEE.
