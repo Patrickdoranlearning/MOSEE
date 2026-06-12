@@ -128,14 +128,18 @@ def get_company_facts(ticker: str) -> Optional[dict]:
 
     cik = resolve_cik(ticker)
     if cik is None:
+        # Non-US / unresolvable ticker — never cached, never retried (correct:
+        # the CIK map is authoritative, a None here is a real "not US-listed").
         return None
 
     url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json"
     raw = _rate_limited_get(url)
     if raw is None:
+        # Transient fetch failure — do NOT cache, so a later attempt can retry.
         return None
 
     data = json.loads(raw)
+    # Only successful, non-empty facts are cached.
     _facts_cache[ticker] = (data, time.time())
     return data
 

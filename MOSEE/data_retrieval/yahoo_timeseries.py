@@ -24,7 +24,14 @@ import numpy as np
 # Rate limiting
 _last_request_time = 0
 _MIN_INTERVAL = 1.5  # conservative, matches yfinance rate limiter
+# Only NON-EMPTY results are cached (see get_extended_financials). A transient
+# timeout/connection failure must stay retryable later in the same process.
 _cache: Dict[str, Dict[str, pd.DataFrame]] = {}
+
+# Transient-fetch retry policy: retry only on timeout/connection errors, never
+# on a clean empty response (a real "no data" answer should not be hammered).
+_MAX_RETRIES = 2          # 2 retries = up to 3 total attempts
+_RETRY_BACKOFF = 2.0      # seconds, added on top of the rate-limit interval
 
 
 # All annual fundamental types available via Yahoo timeseries API
@@ -151,10 +158,46 @@ def _fetch_timeseries(ticker: str, types: List[str]) -> Dict[str, List[Tuple[str
         "merge": "false",
     }
 
-    _last_request_time = time.time()
+    # Retry only on timeout / connection errors (transient). A non-200 status
+    # or a clean empty payload is a real answer and is NOT retried.
+    try:
+        import requests
+        _transient_errors = (
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+        )
+    except Exception:
+        _transient_errors = ()
+
+    resp = None
+    last_exc = None
+    for attempt in range(_MAX_RETRIES + 1):
+        # Respect the rate limiter on every attempt, plus extra backoff on retries.
+        elapsed = time.time() - _last_request_time
+        wait = max(0.0, _MIN_INTERVAL - elapsed)
+        if attempt > 0:
+            wait += _RETRY_BACKOFF * attempt
+        if wait > 0:
+            time.sleep(wait)
+        _last_request_time = time.time()
+        try:
+            resp = session.get(base_url, params=params, timeout=15)
+            break
+        except _transient_errors as e:
+            last_exc = e
+            resp = None
+            continue
+        except Exception as e:
+            # Non-transient request error — do not retry.
+            print(f"  [Yahoo Timeseries] Request error for {ticker}: {e}")
+            return {}
+
+    if resp is None:
+        if last_exc is not None:
+            print(f"  [Yahoo Timeseries] {ticker}: giving up after {_MAX_RETRIES + 1} attempts ({last_exc})")
+        return {}
 
     try:
-        resp = session.get(base_url, params=params, timeout=15)
         if resp.status_code != 200:
             return {}
 
@@ -258,6 +301,7 @@ def get_extended_financials(ticker: str) -> Optional[Dict[str, pd.DataFrame]]:
     parsed = _fetch_timeseries(ticker, all_types)
 
     if not parsed:
+        # Empty/failed fetch — do NOT cache, so a later attempt can retry.
         return None
 
     income_df = _build_dataframe(parsed, _INCOME_TYPES)

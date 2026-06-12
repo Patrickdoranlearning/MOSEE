@@ -198,7 +198,22 @@ def get_extended_financials(ticker: str) -> Optional[Dict[str, pd.DataFrame]]:
     )
 
     if max_years == 0:
+        # Empty/failed fetch — do NOT cache, so a later attempt can retry.
         return None
+
+    # FMP reports each statement's currency under "reportedCurrency". Expose it
+    # so callers can refuse to stitch FMP years onto a base series reported in a
+    # different currency (which would distort growth math). Prefer the income
+    # statement, then balance sheet, then cash flow; None if FMP omits it.
+    reported_currency = None
+    for stmts in (income_data, balance_data, cashflow_data):
+        if isinstance(stmts, list):
+            for stmt in stmts:
+                if isinstance(stmt, dict) and stmt.get("reportedCurrency"):
+                    reported_currency = stmt["reportedCurrency"]
+                    break
+        if reported_currency:
+            break
 
     print(f"  [FMP] {ticker}: {max_years} years of historical data")
 
@@ -206,6 +221,7 @@ def get_extended_financials(ticker: str) -> Optional[Dict[str, pd.DataFrame]]:
         "financials": income_df,
         "balance_sheet": balance_df,
         "cashflow": cashflow_df,
+        "reported_currency": reported_currency,
     }
     _CACHE[cache_key] = result
     return result

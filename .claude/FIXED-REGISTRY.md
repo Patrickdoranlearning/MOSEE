@@ -62,6 +62,30 @@ Visual snapshots (from `jimmy snapshot`) use the same format plus a **Screenshot
 - **Date**: 2026-06-12
 - **Protected until**: permanent
 
+### History-depth source chain — sources stack until 10+ years, EDGAR never shadowed
+- **File**: `MOSEE/data_retrieval/fundamental_data.py` (source-chain loop ~324-420), `MOSEE/data_retrieval/yahoo_timeseries.py` (retry ~154-200)
+- **Lines**: see above
+- **What was fixed**: SEC EDGAR (20yr US history) was skipped whenever Yahoo Timeseries added even one year (`if extended_source is None` gate); a single Yahoo timeout silently shrank the sample to ~5 years with no retry
+- **What the fix looks like**: depth-driven loop — try Yahoo TS → EDGAR → FMP while `max(income, balance, cashflow) years < 10`, never stopping because an earlier source "succeeded"; `[History] {ticker}: N years (sources: ...)` logged per ticker; transient timeouts retried 2x through the rate limiter; empty/failed fetches NEVER cached. Do not reintroduce first-success gating
+- **Date**: 2026-06-12
+- **Protected until**: permanent
+
+### Currency-stitch guard — never merge histories with unverifiable units
+- **File**: `MOSEE/data_retrieval/fundamental_data.py` (`_fmp_currency_ok` + FMP merge gate ~404-415), `MOSEE/data_retrieval/fmp_client.py` (`reported_currency` in return)
+- **Lines**: see above
+- **What was fixed**: the multi-source chain could stitch FMP years (potentially different currency) into a Yahoo-based history, distorting growth math
+- **What the fix looks like**: FMP years merge ONLY when FMP's `reported_currency` matches the ticker's reporting currency (normalized); missing currency metadata → skip with `[History] ... FMP skipped` log. Never stitch unverifiable units
+- **Date**: 2026-06-12
+- **Protected until**: permanent
+
+### Confidence depth honesty — deepest statement measured, per-statement counts visible
+- **File**: `MOSEE/confidence.py` (~134-172)
+- **Lines**: see above
+- **What was fixed**: history-depth scoring read only the cash-flow dataframe; deep income history was invisible to confidence
+- **What the fix looks like**: `years_of_data = max(income, balance, cashflow)` column counts via `income_statement_df` param; additive numeric detail keys `income_years`, `balance_sheet_years`, `cash_flow_statement_years`. NOTE: `cash_flow_years` (string, "5 years (sufficient)") is a SEPARATE pre-existing key consumed by `ConfidenceBreakdown.tsx:127-130` — never overwrite it with a number. Penalty/bonus shape (IDEAL_YEARS=10, MAX_PENALTY=15, MAX_BONUS=5) unchanged
+- **Date**: 2026-06-12
+- **Protected until**: permanent
+
 ### Calculator "Total Repaid" derived from the computed schedule
 - **File**: `web/src/app/wealth-tree/calculator/page.tsx`
 - **Lines**: ~350

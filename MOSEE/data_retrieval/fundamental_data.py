@@ -21,6 +21,10 @@ from MOSEE.data_retrieval.fmp_client import (
 from MOSEE.data_retrieval.yahoo_timeseries import (
     get_extended_financials as yahoo_ts_get_extended_financials,
 )
+from MOSEE.data_retrieval.market_data import (
+    get_reporting_currency,
+    normalize_currency_code,
+)
 
 
 # =============================================================================
@@ -321,72 +325,111 @@ def fundamental_downloads(ticker_temp, use_extended_history=True, db_client=None
         )
         print(f"  [Warehouse] {ticker_temp}: {yf_years} yfinance + {warehouse_years} warehouse = {merged_count} years")
 
-    # ---- STEP 3: If still < 10 years, try external APIs ----
-    # Priority:
-    #   1) Yahoo Timeseries API (all stocks — bypasses yfinance 4yr limit)
-    #   2) SEC EDGAR (US companies, free, no key, most fields)
+    # ---- STEP 3: Depth-driven source chain ----
+    # Goal: reach IDEAL_DEPTH years of history. Earlier code stopped at the
+    # first source that added ANY data (one extra Yahoo Timeseries year set
+    # extended_source and skipped EDGAR's 15-20 free US years). We instead keep
+    # trying remaining sources as long as depth is still below target —
+    # REGARDLESS of whether an earlier source contributed. Each source
+    # back-fills older years via merge_with_yfinance (yfinance preferred on
+    # overlap — that semantic is unchanged).
+    #
+    # Source order (cheapest/broadest first):
+    #   1) Yahoo Timeseries (all stocks — bypasses yfinance 4yr cap)
+    #   2) SEC EDGAR (US only, free, no key, ~20yr, most fields)
     #   3) FMP (global, free tier needs API key)
-    # Each source is tried only if the previous didn't add data.
-    extended_source = None
+    IDEAL_DEPTH = 10
+    contributing_sources = []  # ordered list of sources that actually added years
 
-    def _try_merge(ext_data, source_name):
-        """Attempt to merge extended data, return True if it added years."""
-        nonlocal income_sheet_statements, balance_sheet_statements, cash_flow_statements, extended_source
+    def _depth() -> int:
+        return max(
+            len(income_sheet_statements.columns) if not income_sheet_statements.empty else 0,
+            len(balance_sheet_statements.columns) if not balance_sheet_statements.empty else 0,
+            len(cash_flow_statements.columns) if not cash_flow_statements.empty else 0,
+        )
+
+    def _try_merge(ext_data, source_name) -> bool:
+        """Merge extended data via back-fill; return True if it deepened any statement."""
+        nonlocal income_sheet_statements, balance_sheet_statements, cash_flow_statements
         if ext_data is None:
             return False
+        before = _depth()
         yf_data = {
             'financials': income_sheet_statements,
             'balance_sheet': balance_sheet_statements,
             'cashflow': cash_flow_statements,
         }
         merged = merge_with_yfinance(yf_data, ext_data)
-        new_years = max(
-            len(merged.get('financials', pd.DataFrame()).columns),
-            len(merged.get('balance_sheet', pd.DataFrame()).columns),
-            len(merged.get('cashflow', pd.DataFrame()).columns),
+        merged_income = merged.get('financials', income_sheet_statements)
+        merged_balance = merged.get('balance_sheet', balance_sheet_statements)
+        merged_cashflow = merged.get('cashflow', cash_flow_statements)
+        after = max(
+            len(merged_income.columns) if merged_income is not None and not merged_income.empty else 0,
+            len(merged_balance.columns) if merged_balance is not None and not merged_balance.empty else 0,
+            len(merged_cashflow.columns) if merged_cashflow is not None and not merged_cashflow.empty else 0,
         )
-        if new_years > yf_years:
-            income_sheet_statements = merged.get('financials', income_sheet_statements)
-            balance_sheet_statements = merged.get('balance_sheet', balance_sheet_statements)
-            cash_flow_statements = merged.get('cashflow', cash_flow_statements)
-            extended_source = source_name
+        if after > before:
+            income_sheet_statements = merged_income
+            balance_sheet_statements = merged_balance
+            cash_flow_statements = merged_cashflow
+            contributing_sources.append(source_name)
             return True
         return False
 
-    current_total_years = max(
-        len(income_sheet_statements.columns) if not income_sheet_statements.empty else 0,
-        len(balance_sheet_statements.columns) if not balance_sheet_statements.empty else 0,
-        len(cash_flow_statements.columns) if not cash_flow_statements.empty else 0,
-    )
+    def _fmp_currency_ok(ext_data) -> bool:
+        """Gate the FMP merge on a verified currency match.
 
-    if use_extended_history and current_total_years < 10:
-        # 1) Yahoo Timeseries — works for ALL stocks, bypasses yfinance's 4yr cap
-        try:
-            _try_merge(yahoo_ts_get_extended_financials(ticker_temp), "Yahoo Timeseries")
-        except Exception as e:
-            print(f"  [Extended History] Yahoo Timeseries failed for {ticker_temp}: {e}")
+        FMP can report international tickers in a different currency than the
+        ticker's own reporting currency. Stitching mismatched-currency years
+        onto the base series distorts growth math, so we only merge when FMP's
+        reported currency matches (after minor-unit normalisation). If FMP
+        returns no currency metadata at all, we refuse to stitch unverifiable
+        units. Both refusals log a single explanatory line.
+        """
+        if ext_data is None:
+            return False
+        fmp_currency = ext_data.get("reported_currency") if isinstance(ext_data, dict) else None
+        base_currency = get_reporting_currency(ticker_temp)
+        if not fmp_currency:
+            print(f"  [History] {ticker_temp}: FMP skipped (currency mismatch {base_currency} vs unknown)")
+            return False
+        if normalize_currency_code(fmp_currency) != normalize_currency_code(base_currency):
+            print(f"  [History] {ticker_temp}: FMP skipped (currency mismatch {base_currency} vs {fmp_currency})")
+            return False
+        return True
 
-        # 2) SEC EDGAR — US companies only, but has the most complete field coverage
-        if extended_source is None:
+    if use_extended_history and _depth() < IDEAL_DEPTH:
+        # Each source is gated only on remaining depth need, not on whether a
+        # prior source succeeded. (ticker -> CIK resolution inside EDGAR
+        # correctly returns None for non-US tickers, so .L/.T fall through.)
+        source_fetchers = [
+            ("Yahoo Timeseries", yahoo_ts_get_extended_financials),
+            ("SEC EDGAR", edgar_get_extended_financials),
+            ("FMP", fmp_get_extended_financials),
+        ]
+        for source_name, fetcher in source_fetchers:
+            if _depth() >= IDEAL_DEPTH:
+                break
             try:
-                _try_merge(edgar_get_extended_financials(ticker_temp), "SEC EDGAR")
+                ext_data = fetcher(ticker_temp)
+                # FMP can stitch non-US years in a foreign currency; only merge
+                # when its reported currency is verified to match the base series.
+                if source_name == "FMP" and not _fmp_currency_ok(ext_data):
+                    continue
+                _try_merge(ext_data, source_name)
             except Exception as e:
-                print(f"  [Extended History] EDGAR failed for {ticker_temp}: {e}")
+                print(f"  [Extended History] {source_name} failed for {ticker_temp}: {e}")
 
-        # 3) FMP — global coverage but needs API key and has free-tier limits
-        if extended_source is None:
-            try:
-                _try_merge(fmp_get_extended_financials(ticker_temp), "FMP")
-            except Exception as e:
-                print(f"  [Extended History] FMP failed for {ticker_temp}: {e}")
-
-        merged_years = max(
-            len(income_sheet_statements.columns) if not income_sheet_statements.empty else 0,
-            len(balance_sheet_statements.columns) if not balance_sheet_statements.empty else 0,
-            len(cash_flow_statements.columns) if not cash_flow_statements.empty else 0,
-        )
-        if merged_years > yf_years:
-            print(f"  [Extended History] {ticker_temp}: {yf_years} -> {merged_years} years via {extended_source}")
+    # ---- Honest per-ticker depth logging (one line, always) ----
+    final_depth = _depth()
+    if contributing_sources:
+        source_label = "+".join(contributing_sources)
+        print(f"  [History] {ticker_temp}: {final_depth} years (sources: yfinance+{source_label})")
+    elif final_depth > 0:
+        base_label = "warehouse+yfinance" if warehouse_years > yf_years else "yfinance"
+        print(f"  [History] {ticker_temp}: {final_depth} years (sources: {base_label})")
+    else:
+        print(f"  [History] {ticker_temp}: 0 years (sources: none)")
 
     fundamentals['balance_sheet_statements'] = balance_sheet_statements
     fundamentals['cash_flow_statements'] = cash_flow_statements

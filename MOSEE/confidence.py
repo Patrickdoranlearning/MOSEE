@@ -42,18 +42,23 @@ def calculate_data_quality_score(
     balance_sheet_df: Optional[pd.DataFrame],
     market_cap: Optional[float],
     current_price: Optional[float],
-    min_years: int = 3
+    min_years: int = 3,
+    income_statement_df: Optional[pd.DataFrame] = None
 ) -> Tuple[float, Dict[str, Any]]:
     """
     Calculate data quality score based on completeness of financial data.
-    
+
     Args:
         cash_flow_df: Cash flow statement DataFrame
         balance_sheet_df: Balance sheet DataFrame
         market_cap: Market capitalization
         current_price: Current stock price
         min_years: Minimum years of data required for full score
-        
+        income_statement_df: Income statement DataFrame (optional). When
+            provided, history-depth scoring uses the deepest of the three
+            statements rather than cash flow alone — income/balance sheets
+            often reach further back (e.g. SEC EDGAR income to ~20yr).
+
     Returns:
         Tuple of (score 0-100, details dict)
     """
@@ -131,11 +136,36 @@ def calculate_data_quality_score(
     MAX_BONUS = 5         # max bonus points for deep history
     MAX_PENALTY = 15      # max penalty for shallow history
 
-    years_available = 0
-    if cash_flow_df is not None and not cash_flow_df.empty:
-        years_available = len(cash_flow_df.columns) if hasattr(cash_flow_df, 'columns') else 0
+    # Depth = the deepest of the three statements. Income and balance sheets
+    # frequently reach further back than cash flow (e.g. SEC EDGAR income to
+    # ~20yr while cash flow stops at ~10), so measuring cash flow alone
+    # understated true history depth. Scoring shape (penalty/bonus) unchanged.
+    def _df_year_count(df) -> int:
+        if df is not None and hasattr(df, 'empty') and not df.empty:
+            return len(df.columns) if hasattr(df, 'columns') else 0
+        return 0
+
+    income_years = _df_year_count(income_statement_df)
+    balance_sheet_years = _df_year_count(balance_sheet_df)
+    cash_flow_statement_years = _df_year_count(cash_flow_df)
+
+    years_available = max(
+        cash_flow_statement_years,
+        balance_sheet_years,
+        income_years,
+    )
 
     details["years_of_data"] = years_available
+
+    # Per-statement depth (additive breakdown). years_of_data above is the
+    # deepest of the three, which hides a deep-income/shallow-cashflow profile.
+    # These expose each statement's own column count so that imbalance stays
+    # visible. Note: a string key "cash_flow_years" already exists above (the
+    # cash-flow-completeness section, consumed by web), so the numeric cash flow
+    # depth is exposed under "cash_flow_statement_years" to avoid clobbering it.
+    details["income_years"] = income_years
+    details["balance_sheet_years"] = balance_sheet_years
+    details["cash_flow_statement_years"] = cash_flow_statement_years
 
     if years_available < IDEAL_YEARS:
         history_penalty = (IDEAL_YEARS - years_available) / IDEAL_YEARS * MAX_PENALTY
@@ -244,7 +274,8 @@ def calculate_confidence(
     pad_value: Optional[float] = None,
     book_value: Optional[float] = None,
     data_weight: float = 0.5,
-    consistency_weight: float = 0.5
+    consistency_weight: float = 0.5,
+    income_statement_df: Optional[pd.DataFrame] = None
 ) -> ConfidenceScore:
     """
     Calculate combined confidence score.
@@ -265,7 +296,8 @@ def calculate_confidence(
     """
     # Calculate component scores
     data_score, data_details = calculate_data_quality_score(
-        cash_flow_df, balance_sheet_df, market_cap, current_price
+        cash_flow_df, balance_sheet_df, market_cap, current_price,
+        income_statement_df=income_statement_df
     )
     
     consistency_score, consistency_details = calculate_metric_consistency_score(

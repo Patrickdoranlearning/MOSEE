@@ -413,7 +413,8 @@ def run_single_analysis(
             current_price=current_price,
             dcf_value=dcf_value,
             pad_value=pad_value,
-            book_value=book_valuation
+            book_value=book_valuation,
+            income_statement_df=income_statement
         )
 
         # Fisher Scuttlebutt Score — competitive advantage analysis
