@@ -16,7 +16,7 @@ Features:
 - PDF one-pager reports for quick stock review
 - Historical tracking and month-over-month comparisons
 - Multiple filter options (country, industry, market cap)
-- Uses FREE APIs (yfinance, forex_python)
+- Uses FREE APIs (yfinance)
     ''',
     author='Patrick Doran',
     author_email='patrick@example.com',
@@ -26,7 +26,6 @@ Features:
     install_requires=[
         # Data retrieval
         'yfinance>=0.2.0',
-        'forex-python>=1.8',
         # Data processing
         'pandas>=2.0.0',
         'numpy>=1.24.0',

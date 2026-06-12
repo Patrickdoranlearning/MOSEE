@@ -23,7 +23,6 @@ from .fundamental_data import (
 from .market_data import (
     get_stock_data,
     get_ticker_info,
-    convert_currency
 )
 
 from .rate_limiter import (
@@ -48,7 +47,6 @@ __all__ = [
     # Market data
     'get_stock_data',
     'get_ticker_info',
-    'convert_currency',
     # Rate limiting
     'configure_rate_limiter',
     'clear_cache',

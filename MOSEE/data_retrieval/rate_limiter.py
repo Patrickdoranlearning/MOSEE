@@ -576,6 +576,89 @@ def get_financial_statements(ticker: str) -> dict:
     return result
 
 
+def get_fx_pair_rate(pair: str) -> Optional[float]:
+    """
+    Fetch a single FX pair close price from yfinance, routed through the rate
+    limiter's throttle and a long-lived TTL cache.
+
+    FX rates are slow-moving, so a multi-hour cache TTL is appropriate and keeps
+    us well under Yahoo's request limits. The cache key is namespaced so it does
+    not collide with equity ticker caches.
+
+    Args:
+        pair: yfinance FX pair ticker, e.g. 'GBPUSD=X'
+
+    Returns:
+        The latest close price as a float, or None if no data is available or
+        the value is NaN/Inf. Never fabricates a rate.
+    """
+    cache_key = f"fx_pair_rate|{pair}"
+
+    # Long-lived FX cache (independent of the 30-min equity TTL).
+    fx_ttl_minutes = 6 * 60
+    if _rate_limit_settings['enable_caching']:
+        with _cache_lock:
+            entry = _cache.get(cache_key)
+            if entry:
+                expiry = entry.get('expiry')
+                if expiry and datetime.now() < expiry:
+                    return entry.get('value')
+                else:
+                    del _cache[cache_key]
+
+    _wait_for_rate_limit()
+
+    try:
+        tick = _get_cached_ticker(pair)
+        hist = tick.history(period='1d')
+    except Exception as e:
+        if _is_rate_limit_error(e):
+            for attempt in range(_rate_limit_settings['max_retries']):
+                delay = _calculate_backoff_delay(attempt)
+                print(f"Rate limit on FX pair {pair}. Waiting {delay:.1f}s...")
+                _refresh_ticker_cache()
+                time.sleep(delay)
+                try:
+                    _wait_for_rate_limit()
+                    tick = _get_cached_ticker(pair)
+                    hist = tick.history(period='1d')
+                    break
+                except Exception as retry_e:
+                    if not _is_rate_limit_error(retry_e):
+                        print(f"FX pair fetch failed for {pair}: {retry_e}")
+                        return None
+            else:
+                print(f"Rate limit: max retries exceeded for FX pair {pair}")
+                return None
+        else:
+            print(f"FX pair fetch failed for {pair}: {e}")
+            return None
+
+    if hist is None or hist.empty or 'Close' not in hist.columns:
+        return None
+
+    rate = hist['Close'].iloc[-1]
+    if hasattr(rate, 'item'):
+        rate = rate.item()
+
+    # Guard against NaN/Inf/non-positive rates — never cache or return a bad rate.
+    try:
+        rate = float(rate)
+    except (TypeError, ValueError):
+        return None
+    if not (rate > 0) or rate in (float('inf'), float('-inf')) or rate != rate:
+        return None
+
+    if _rate_limit_settings['enable_caching']:
+        with _cache_lock:
+            _cache[cache_key] = {
+                'value': rate,
+                'expiry': datetime.now() + timedelta(minutes=fx_ttl_minutes),
+            }
+
+    return rate
+
+
 def batch_get_ticker_info(tickers: list) -> dict:
     """
     Get info for multiple tickers efficiently.

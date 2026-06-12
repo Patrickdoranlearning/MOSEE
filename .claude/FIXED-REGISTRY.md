@@ -54,6 +54,14 @@ Visual snapshots (from `jimmy snapshot`) use the same format plus a **Screenshot
 - **Date**: 2026-06-12
 - **Protected until**: permanent
 
+### FX never-fabricate contract — None propagates, never a fake 1.0
+- **File**: `MOSEE/data_retrieval/market_data.py` (`get_exchange_rate_to_usd`, `convert_value_to_usd`, `convert_dataframe_to_usd`), `MOSEE/data_retrieval/rate_limiter.py` (`get_fx_pair_rate`), `scripts/run_local_report.py` (~166-178), `scripts/run_weekly_analysis.py` (~186-193)
+- **Lines**: see functions above
+- **What was fixed**: FX rates now come exclusively from yfinance pair tickers (`{CCY}USD=X`) through the rate limiter with TTL cache — freecurrencyapi/forex_python removed. A failed/unknown rate returns `None`, the ticker is skipped with a warning, and the on-demand path no longer crashes with TypeError
+- **What the fix looks like**: NO code path may return or substitute a default rate (1.0 or otherwise). `get_fx_pair_rate` guards empty history/NaN/Inf/zero/negative and never caches None. `convert_value_to_usd` returns None and `convert_dataframe_to_usd` returns the df unconverted (with warning) when the rate is None. Both analysis scripts skip the ticker on a None rate. NEVER reintroduce a keyed FX API or a fabricated fallback rate
+- **Date**: 2026-06-12
+- **Protected until**: permanent
+
 ### Calculator "Total Repaid" derived from the computed schedule
 - **File**: `web/src/app/wealth-tree/calculator/page.tsx`
 - **Lines**: ~350

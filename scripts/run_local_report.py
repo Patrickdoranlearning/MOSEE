@@ -163,9 +163,19 @@ def run_single_analysis(
         # Get reporting currency and convert all financial data to USD
         reporting_currency = get_reporting_currency(ticker)
 
-        # Get exchange rates (fetch once and reuse for efficiency)
-        reporting_to_usd_rate = get_exchange_rate_to_usd(reporting_currency)
-        trading_to_usd_rate = get_exchange_rate_to_usd(stock_currency)
+        # Get exchange rates (fetch once and reuse for efficiency).
+        # USD never needs a lookup. A None rate for a non-USD currency means the
+        # FX fetch failed — skip the ticker rather than convert with a fabricated
+        # 1.0 rate, which would corrupt every value in the row.
+        reporting_to_usd_rate = 1.0 if reporting_currency == 'USD' else get_exchange_rate_to_usd(reporting_currency)
+        trading_to_usd_rate = 1.0 if stock_currency == 'USD' else get_exchange_rate_to_usd(stock_currency)
+
+        if reporting_currency != 'USD' and reporting_to_usd_rate is None:
+            print(f"    No FX rate for reporting currency {reporting_currency} — skipping {ticker}")
+            return None
+        if stock_currency != 'USD' and trading_to_usd_rate is None:
+            print(f"    No FX rate for trading currency {stock_currency} — skipping {ticker}")
+            return None
 
         # Convert financial statements from reporting currency to USD
         if reporting_currency != 'USD':

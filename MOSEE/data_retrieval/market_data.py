@@ -1,9 +1,42 @@
-import os
 import yfinance as yf
-from forex_python.converter import CurrencyRates
-import freecurrencyapi
-from datetime import date, timedelta, datetime
+import pandas as pd
 
+from MOSEE.data_retrieval.rate_limiter import get_fx_pair_rate as rl_get_fx_pair_rate
+
+
+# Minor currency units that yfinance reports for some exchanges. Each maps to its
+# major unit and the divisor needed to convert prices into the major unit.
+# South Africa: yfinance reports JSE quotes in 'ZAc' (cents), verified live against
+# NPN.JO/AGL.JO/SOL.JO (all returned 'ZAc'; SOL price 21482 ZAc = R214.82 confirms
+# the ÷100). 'ZAr' is unobserved in practice (kept defensively, divisor 1); if it
+# ever appears it would denote whole rand. Both normalize to ZAR. Shared by
+# get_stock_data (which divides prices) and get_reporting_currency (code-only).
+MINOR_TO_MAJOR = {
+    'GBp': ('GBP', 100),
+    'ILA': ('ILS', 100),
+    'ZAc': ('ZAR', 100),
+    'ZAr': ('ZAR', 1),
+}
+
+
+def normalize_currency_code(currency):
+    """
+    Normalize a currency code to its major-unit equivalent (code only, no price
+    division). E.g. 'GBp' -> 'GBP', 'ILA' -> 'ILS', 'ZAc'/'ZAr' -> 'ZAR'.
+
+    Args:
+        currency: A currency code, possibly a minor unit. May be None.
+
+    Returns:
+        The upper-cased major-unit currency code, or the original (upper-cased)
+        code when no normalization applies. Returns the input unchanged when it
+        is falsy.
+    """
+    if not currency:
+        return currency
+    if currency in MINOR_TO_MAJOR:
+        return MINOR_TO_MAJOR[currency][0]
+    return currency.upper()
 
 
 def get_stock_data(ticker, start_date, end_date):
@@ -34,14 +67,10 @@ def get_stock_data(ticker, start_date, end_date):
     # Handle minor currency units (e.g., GBp=pence, ILA=agorot, ZAc=cents)
     # yfinance returns prices in these minor units for some exchanges,
     # but financial statements are in major units (GBP, ILS, ZAR).
-    # Convert prices to major currency units for consistency.
-    minor_to_major = {
-        'GBp': ('GBP', 100),
-        'ILA': ('ILS', 100),
-        'ZAc': ('ZAR', 100),
-    }
-    if currency in minor_to_major:
-        major_currency, divisor = minor_to_major[currency]
+    # Convert prices to major currency units for consistency. Uses the shared
+    # MINOR_TO_MAJOR map (same source of truth as get_reporting_currency).
+    if currency in MINOR_TO_MAJOR:
+        major_currency, divisor = MINOR_TO_MAJOR[currency]
         print(f"  Converting {currency} to {major_currency} (÷{divisor})")
         stock_data['Close'] = stock_data['Close'] / divisor
         stock_data['Open'] = stock_data['Open'] / divisor
@@ -74,12 +103,6 @@ def get_ticker_info(ticker):
     return ticker_info
 
 
-import pandas as pd
-from datetime import date, timedelta
-from forex_python.converter import CurrencyRates
-import freecurrencyapi
-
-
 def get_scuttlebutt_info(ticker: str) -> dict:
     """
     Extract qualitative / scuttlebutt data from yfinance ticker info.
@@ -102,137 +125,13 @@ def get_scuttlebutt_info(ticker: str) -> dict:
         'forward_pe': info.get('forwardPE'),
     }
 
-currency_api_key = os.environ.get('CURRENCY_API_KEY', '')
+# Per-process cache of {currency: rate} so each currency is fetched once per run.
+# Cleared implicitly when the process exits. None is never cached (a transient
+# failure should be retried on the next ticker rather than poisoning the cache).
+_exchange_rate_cache = {}
 
 
-def convert_currency(amount, currency_from, currency_to, fx_df):
-    """
-    Production---
-    Convert a specified amount from one currency to another.
-    The amount can be a single float value or a dataframe
-
-    Args:
-    - amount (float or dataframe): The amount of currency to convert.
-    - currency_from (str): The currency code to convert from.
-    - currency_to (str): The currency code to convert to.
-    - fx_df (DataFrame): DataFrame containing exchange rates.
-
-    Returns:
-    - float: The converted amount in the target currency.
-    """
-    currency_from = currency_from.upper()
-    currency_to = currency_to.upper()
-
-    try:
-        # Try accessing the exchange rate from the DataFrame
-        exchange_rate = fx_df[(fx_df['Currency_From'] == currency_from) &
-                              (fx_df['Currency_To'] == currency_to)]['Exchange_Rate'].values[0]
-        last_download_date = fx_df[(fx_df['Currency_From'] == currency_from) &
-                                   (fx_df['Currency_To'] == currency_to)]['date'].values[0]
-        if type(last_download_date) == str:
-            last_download_date = datetime.strptime(last_download_date, '%d/%m/%Y').date()
-            print(last_download_date)
-        if date.today() - last_download_date > timedelta(weeks=4) or pd.isna(last_download_date):
-            try:
-                # Try accessing the second API as a backup
-                client = freecurrencyapi.Client(currency_api_key)
-                result = client.latest([currency_from])
-                exchange_rate = result['data'][currency_to]
-                today = date.today()
-                print(today)
-
-                # Create a new DataFrame with the new row data
-                new_row_df = pd.DataFrame({
-                    'Currency_From': [currency_from, currency_to],
-                    'Currency_To': [currency_to, currency_from],
-                    'Exchange_Rate': [exchange_rate, 1 / exchange_rate],
-                    'date': [today, today]
-                })
-
-                print(new_row_df)
-
-                # Concatenate the new row DataFrame with the existing fx_df
-                fx_df = pd.concat([fx_df, new_row_df], ignore_index=True)
-
-            except Exception as e:
-                print(f"Error accessing free currency API: {e}")
-                try:
-                    c = CurrencyRates()
-                    exchange_rate = c.get_rate(currency_from, currency_to)
-                    today = date.today()
-                    # Create a new DataFrame with the new row data
-                    new_row_df = pd.DataFrame({
-                        'Currency_From': [currency_from, currency_to],
-                        'Currency_To': [currency_to, currency_from],
-                        'Exchange_Rate': [exchange_rate, 1 / exchange_rate],
-                        'date': [today, today]
-                    })
-
-                    # Concatenate the new row DataFrame with the existing fx_df
-                    fx_df = pd.concat([fx_df, new_row_df], ignore_index=True)
-                except Exception as e:
-                    print(f"Error accessing forex API: {e}")
-                    raise ValueError(f"Error accessing second API: {e}")
-
-    except IndexError:
-        # If the exchange rate is not available in the DataFrame, update it
-        try:
-            # Try accessing the second API as a backup
-            client = freecurrencyapi.Client(currency_api_key)
-            result = client.latest([currency_from])
-            exchange_rate = result['data'][currency_to]
-            today = date.today()
-            print('here')
-            # Create a new DataFrame with the new row data
-            for currency_to_temp, exchange_rate_temp in result['data'].items():
-                filtered_df = fx_df[
-                    (fx_df['Currency_From'] == currency_from) & (fx_df['Currency_To'] == currency_to_temp)]
-                if not filtered_df.empty:
-                    exchange_rate = filtered_df['Exchange_Rate'].values[0]  # Assuming you want the first rate
-                    print(f"Exchange rate: {exchange_rate}")
-                else:
-                    new_row_df = pd.DataFrame({
-                        'Currency_From': [currency_from],
-                        'Currency_To': [currency_to_temp],
-                        'Exchange_Rate': [exchange_rate_temp],
-                        'date': [today]
-                    })
-                    # Concatenate the new row DataFrame with the existing fx_df
-                    fx_df = pd.concat([fx_df, new_row_df], ignore_index=True)
-
-        except Exception as e:
-            print(f"Error accessing free currency API: {e}")
-
-            try:
-                # Try accessing the first API
-                c = CurrencyRates()
-                exchange_rate = c.get_rate(currency_from, currency_to)
-                today = date.today()
-                # Create a new DataFrame with the new row data
-                new_row_df = pd.DataFrame({
-                    'Currency_From': [currency_from, currency_to],
-                    'Currency_To': [currency_to, currency_from],
-                    'Exchange_Rate': [exchange_rate, 1 / exchange_rate],
-                    'date': [today, today]
-                })
-
-                # Concatenate the new row DataFrame with the existing fx_df
-                fx_df = pd.concat([fx_df, new_row_df], ignore_index=True)
-            except Exception as e:
-                print(f"Error accessing forex API: {e}")
-                try:
-                    # Try accessing the exchange rate from the DataFrame
-                    exchange_rate = fx_df[(fx_df['Currency_From'] == currency_from) &
-                                          (fx_df['Currency_To'] == currency_to)]['Exchange_Rate'].values[0]
-                except Exception as e:
-                    print(f"Error accessing no currency value found: {e}")
-                    raise ValueError(f"Error accessing second API: {e}")
-
-    converted_amount = amount * exchange_rate
-    return converted_amount, fx_df
-
-
-def get_exchange_rate_to_usd(from_currency: str) -> float:
+def get_exchange_rate_to_usd(from_currency: str):
     """
     Get the exchange rate to convert from a given currency to USD.
 
@@ -240,48 +139,43 @@ def get_exchange_rate_to_usd(from_currency: str) -> float:
         from_currency: The currency code to convert from (e.g., 'JPY', 'EUR', 'GBP')
 
     Returns:
-        Exchange rate (multiply by this to convert to USD)
-        Returns 1.0 if from_currency is USD or if rate cannot be fetched
+        Exchange rate (multiply by this to convert to USD), 1.0 for USD, or
+        None when the rate cannot be fetched. Callers must NOT treat None as 1.0
+        — fabricating a 1.0 rate for a non-USD currency corrupts every converted
+        value. A non-USD ticker with a None rate should be skipped.
     """
-    from_currency = from_currency.upper()
+    from_currency = normalize_currency_code(from_currency)
 
     if from_currency == 'USD':
         return 1.0
 
-    # Try freecurrencyapi first
-    try:
-        client = freecurrencyapi.Client(currency_api_key)
-        result = client.latest(base_currency='USD')
-        # API returns rates relative to USD, so we need the inverse
-        if from_currency in result['data']:
-            rate_usd_to_foreign = result['data'][from_currency]
-            return 1.0 / rate_usd_to_foreign
-    except Exception as e:
-        print(f"freecurrencyapi failed for {from_currency}: {e}")
+    if from_currency in _exchange_rate_cache:
+        return _exchange_rate_cache[from_currency]
 
-    # Fallback to forex_python
-    try:
-        c = CurrencyRates()
-        rate = c.get_rate(from_currency, 'USD')
+    # yfinance FX pairs are the sole rate source — no API key, same data source
+    # as every other fetch. Whitelist the currencies present in our universe so
+    # we never request a malformed pair for a bad/unknown code.
+    supported_currencies = {
+        'JPY', 'EUR', 'GBP', 'CAD', 'AUD', 'CHF', 'HKD',
+        'DKK', 'SEK', 'NOK', 'NZD', 'SGD', 'INR', 'KRW',
+        'BRL', 'MXN', 'CNY', 'ILS', 'ZAR',
+    }
+
+    if from_currency not in supported_currencies:
+        print(f"WARNING: No FX pair configured for {from_currency} — skipping (no fabricated 1.0)")
+        return None
+
+    # Route the yfinance fetch through the rate limiter's throttle + long TTL cache.
+    pair = f"{from_currency}USD=X"
+    rate = rl_get_fx_pair_rate(pair)
+
+    if rate is not None:
+        # rl_get_fx_pair_rate already guards NaN/Inf/non-positive.
+        _exchange_rate_cache[from_currency] = rate
         return rate
-    except Exception as e:
-        print(f"forex_python failed for {from_currency}: {e}")
 
-    # Last resort: use yfinance for major currency pairs
-    try:
-        if from_currency in ['JPY', 'EUR', 'GBP', 'CAD', 'AUD', 'CHF',
-                              'DKK', 'SEK', 'NOK', 'NZD', 'HKD', 'SGD',
-                              'INR', 'KRW', 'BRL', 'MXN']:
-            pair = f"{from_currency}USD=X"
-            ticker = yf.Ticker(pair)
-            hist = ticker.history(period='1d')
-            if not hist.empty:
-                return hist['Close'].iloc[-1]
-    except Exception as e:
-        print(f"yfinance currency fallback failed for {from_currency}: {e}")
-
-    print(f"WARNING: Could not get exchange rate for {from_currency}, using 1.0")
-    return 1.0
+    print(f"WARNING: Could not get exchange rate for {from_currency} — skipping (no fabricated 1.0)")
+    return None
 
 
 def convert_value_to_usd(value, from_currency: str, exchange_rate: float = None) -> float:
@@ -301,6 +195,10 @@ def convert_value_to_usd(value, from_currency: str, exchange_rate: float = None)
 
     if exchange_rate is None:
         exchange_rate = get_exchange_rate_to_usd(from_currency)
+
+    if exchange_rate is None:
+        print(f"WARNING: No exchange rate for {from_currency} — cannot convert value (no fabricated 1.0)")
+        return None
 
     return value * exchange_rate
 
@@ -325,6 +223,10 @@ def convert_dataframe_to_usd(df: pd.DataFrame, from_currency: str, exchange_rate
 
     if exchange_rate is None:
         exchange_rate = get_exchange_rate_to_usd(from_currency)
+
+    if exchange_rate is None:
+        print(f"WARNING: No exchange rate for {from_currency} — skipping DataFrame conversion (no fabricated 1.0)")
+        return df
 
     # Create a copy to avoid modifying the original
     df_converted = df.copy()
@@ -357,16 +259,18 @@ def get_reporting_currency(ticker: str) -> str:
         # Use rate-limited ticker info
         info = rl_get_ticker_info(ticker)
 
-        # yfinance provides 'financialCurrency' for reporting currency
+        # yfinance provides 'financialCurrency' for reporting currency.
+        # Normalize minor units (GBp/ILA/ZAc) to their major code so this matches
+        # the currency get_stock_data reports after its ÷100 price adjustment.
         reporting_currency = info.get('financialCurrency')
 
         if reporting_currency:
-            return reporting_currency.upper()
+            return normalize_currency_code(reporting_currency)
 
         # Fallback to trading currency if reporting currency not available
         trading_currency = info.get('currency')
         if trading_currency:
-            return trading_currency.upper()
+            return normalize_currency_code(trading_currency)
 
     except Exception as e:
         print(f"Could not get reporting currency for {ticker}: {e}")

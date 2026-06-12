@@ -3,7 +3,7 @@
 
 # Data retrieval
 yfinance>=0.2.54  # Critical: fixes for Yahoo's 2024 API changes
-forex-python>=1.8
+# FX rates are sourced from yfinance pairs ({CCY}USD=X); no separate FX library.
 
 # Data processing
 pandas>=2.0.0
