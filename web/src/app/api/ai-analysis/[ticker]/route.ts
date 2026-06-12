@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { spawn } from 'child_process'
 import path from 'path'
+import { moseePython } from '@/lib/python'
 import { sql } from '@vercel/postgres'
 
 interface RouteContext {
@@ -15,7 +16,7 @@ function runAIAnalysis(ticker: string): Promise<void> {
     const projectRoot = path.resolve(process.cwd(), '..')
     const scriptPath = path.join(projectRoot, 'scripts', 'run_ai_analysis.py')
 
-    const proc = spawn('python', [scriptPath, ticker, '--verbose'], {
+    const proc = spawn(moseePython(projectRoot), [scriptPath, ticker, '--verbose'], {
       cwd: projectRoot,
       env: { ...process.env },
       timeout: 180_000, // 3 minutes — AI analysis takes longer

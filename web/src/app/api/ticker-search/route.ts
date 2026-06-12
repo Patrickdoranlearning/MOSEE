@@ -29,7 +29,9 @@ export async function GET(request: NextRequest) {
   const url =
     'https://query2.finance.yahoo.com/v1/finance/search?q=' +
     encodeURIComponent(q) +
-    '&quotesCount=8&newsCount=0'
+    // enableFuzzyQuery: typo tolerance — "evenplay" still finds EVPL.L
+    // (verified: without it Yahoo returns 0 results for misspellings).
+    '&quotesCount=8&newsCount=0&enableFuzzyQuery=true'
 
   try {
     const res = await fetch(url, {

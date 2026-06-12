@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { spawn } from 'child_process'
 import fs from 'fs'
 import path from 'path'
+import { moseePython } from '@/lib/python'
 
 const KB_DIR = path.resolve(process.cwd(), '..', 'knowledge_base')
 
@@ -165,7 +166,7 @@ async function rebuildKB(): Promise<NextResponse> {
     const projectRoot = path.resolve(process.cwd(), '..')
     const scriptPath = path.join(projectRoot, 'scripts', 'build_knowledge_base.py')
 
-    const proc = spawn('python', [scriptPath], {
+    const proc = spawn(moseePython(projectRoot), [scriptPath], {
       cwd: projectRoot,
       env: { ...process.env },
       timeout: 600_000,  // 10 min — first run downloads embedding model

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { spawn } from 'child_process'
 import path from 'path'
+import { moseePython } from '@/lib/python'
 
 interface RouteContext {
   params: Promise<{ ticker: string }>
@@ -11,7 +12,7 @@ function fetchPreview(ticker: string): Promise<Record<string, unknown>> {
     const projectRoot = path.resolve(process.cwd(), '..')
     const scriptPath = path.join(projectRoot, 'scripts', 'fetch_preview.py')
 
-    const proc = spawn('python', [scriptPath, ticker], {
+    const proc = spawn(moseePython(projectRoot), [scriptPath, ticker], {
       cwd: projectRoot,
       env: { ...process.env },
       timeout: 20_000,
