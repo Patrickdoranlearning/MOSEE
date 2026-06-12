@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { TeachingCard } from '@/components/wealth-tree/TeachingCard'
 import { formatWealthCurrency } from '@/types/wealth-tree'
 import type { Investment } from '@/types/wealth-tree'
 
@@ -133,6 +134,8 @@ export default function InvestmentsPage() {
           {showForm ? 'Cancel' : '+ Add Investment'}
         </button>
       </div>
+
+      <TeachingCard topics={['investing', 'risk']} />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

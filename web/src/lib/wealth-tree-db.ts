@@ -18,6 +18,7 @@ import type {
   SkillInvestment,
   WealthDashboard,
   TreeTier,
+  CureNumber,
   RecurrenceFrequency,
 } from '@/types/wealth-tree'
 
@@ -558,6 +559,10 @@ export async function getWealthDashboard(userId: string): Promise<WealthDashboar
     debtsResult,
     netWorthResult,
     goalsResult,
+    realEstateResult,
+    mortgageResult,
+    retirementResult,
+    skillsResult,
   ] = await Promise.all([
     sql`SELECT * FROM wt_profiles WHERE user_id = ${userId} LIMIT 1`,
     sql`SELECT COALESCE(SUM(amount), 0) as total FROM wt_income WHERE user_id = ${userId} AND entry_date BETWEEN ${monthStart} AND ${monthEnd}`,
@@ -569,6 +574,14 @@ export async function getWealthDashboard(userId: string): Promise<WealthDashboar
     sql`SELECT COALESCE(SUM(current_balance), 0) as total FROM wt_debts WHERE user_id = ${userId}`,
     sql`SELECT * FROM wt_net_worth WHERE user_id = ${userId} ORDER BY snapshot_date DESC LIMIT 1`,
     sql`SELECT tree_tier, status, COUNT(*) as cnt FROM wt_goals WHERE user_id = ${userId} GROUP BY tree_tier, status`,
+    // Cure 5 (home): real-estate investments — current value of owned property
+    sql`SELECT COALESCE(SUM(current_value), 0) as total FROM wt_investments WHERE user_id = ${userId} AND asset_type = 'real_estate'`,
+    // Cure 5 (home): mortgage debts — outstanding balance and original principal
+    sql`SELECT COALESCE(SUM(current_balance), 0) as balance, COALESCE(SUM(original_amount), 0) as original, COUNT(*) as cnt FROM wt_debts WHERE user_id = ${userId} AND debt_type = 'mortgage'`,
+    // Cure 6 (future income): retirement-account investments
+    sql`SELECT COALESCE(SUM(current_value), 0) as total FROM wt_investments WHERE user_id = ${userId} AND account IN ('ira', '401k', 'roth', 'hsa')`,
+    // Cure 7 (earning ability): skills grouped by status
+    sql`SELECT status, COUNT(*) as cnt FROM wt_skills WHERE user_id = ${userId} GROUP BY status`,
   ])
 
   const profile = profileResult.rows.length > 0 ? (profileResult.rows[0] as unknown as WealthProfile) : null
@@ -606,15 +619,66 @@ export async function getWealthDashboard(userId: string): Promise<WealthDashboar
     }
   }
 
-  // Simple cure health scores (0-100)
-  const cureScores: Record<number, number> = {
+  // ─── Cure scores 5/6/7: honest computation from existing data ────
+  // Each clamps to [0, 100], guards divide-by-zero, and returns `null`
+  // ("not tracked") rather than a fabricated 0 when the inputs are absent.
+
+  // Cure 5 (home): home-equity ratio if real estate exists; else mortgage
+  // paydown if a mortgage with a known original principal exists; else null.
+  const reValue = Number(realEstateResult.rows[0]?.total) || 0
+  const mortgageBalance = Number(mortgageResult.rows[0]?.balance) || 0
+  const mortgageOriginal = Number(mortgageResult.rows[0]?.original) || 0
+  const mortgageCount = Number(mortgageResult.rows[0]?.cnt) || 0
+  let cure5: number | null
+  if (reValue > 0) {
+    // Equity ratio: how much of the home you actually own.
+    cure5 = Math.max(0, Math.min(100, Math.round(((reValue - mortgageBalance) / reValue) * 100)))
+  } else if (mortgageCount > 0 && mortgageOriginal > 0) {
+    // No RE value tracked, but a mortgage is — score by how far it's paid down.
+    cure5 = Math.max(0, Math.min(100, Math.round((1 - mortgageBalance / mortgageOriginal) * 100)))
+  } else {
+    cure5 = null
+  }
+
+  // Cure 6 (future income): retirement balance vs a 10x-income target.
+  // 10x annual income is a common rule-of-thumb retirement goal (heuristic,
+  // not advice). Null when there's no retirement balance OR no income to
+  // measure against (UI hint: complete profile).
+  const retirementTotal = Number(retirementResult.rows[0]?.total) || 0
+  const annualIncome = profile ? Number(profile.annual_income) || 0 : 0
+  let cure6: number | null
+  if (retirementTotal > 0 && annualIncome > 0) {
+    cure6 = Math.min(100, Math.round((retirementTotal / (10 * annualIncome)) * 100))
+  } else {
+    cure6 = null
+  }
+
+  // Cure 7 (earning ability): skill-investment engagement heuristic.
+  // 30 base for having any skill tracked, +20 per completed, +10 per in-progress,
+  // capped at 100. Null when no skills are tracked at all.
+  let skillsCompleted = 0
+  let skillsInProgress = 0
+  let skillsTotal = 0
+  for (const row of skillsResult.rows) {
+    const cnt = Number(row.cnt) || 0
+    skillsTotal += cnt
+    if (row.status === 'completed') skillsCompleted += cnt
+    else if (row.status === 'in_progress') skillsInProgress += cnt
+  }
+  const cure7: number | null =
+    skillsTotal === 0
+      ? null
+      : Math.min(100, 30 + skillsCompleted * 20 + skillsInProgress * 10)
+
+  // Cures 1-4 unchanged.
+  const cureScores: Record<CureNumber, number | null> = {
     1: Math.min(Math.round((savingsRateActual / savingsRateTarget) * 100), 100),
     2: incomeMonth > 0 ? Math.min(Math.round(((incomeMonth - expensesMonth) / incomeMonth) * 100), 100) : 0,
     3: totalInvestments > 0 ? Math.min(50 + Math.round((totalInvestments / (incomeYtd || 1)) * 50), 100) : 0,
     4: Math.round(emergencyFundProgress * 100),
-    5: 0, // Would need real estate data
-    6: 0, // Would need retirement tracking
-    7: 0, // Would need skills data
+    5: cure5,
+    6: cure6,
+    7: cure7,
   }
 
   return {
@@ -631,6 +695,6 @@ export async function getWealthDashboard(userId: string): Promise<WealthDashboar
     net_worth: latestNetWorth,
     emergency_fund_progress: emergencyFundProgress,
     goals_by_tier: goalsByTier,
-    cure_scores: cureScores as unknown as Record<1 | 2 | 3 | 4 | 5 | 6 | 7, number>,
+    cure_scores: cureScores,
   }
 }

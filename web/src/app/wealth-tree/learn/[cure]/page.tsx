@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { SEVEN_CURES, TIER_COLORS } from '@/types/wealth-tree'
 import type { CureNumber } from '@/types/wealth-tree'
+import { getBook, getTeachingsForCure } from '@/lib/wealth-education'
 
 // Detailed educational content for each cure
 const CURE_CONTENT: Record<number, {
@@ -157,6 +158,11 @@ export default async function CureDetailPage({ params }: { params: Promise<{ cur
   const content = CURE_CONTENT[cureNumber]
   const colors = TIER_COLORS[cure.tier]
 
+  // Guru teachings for this cure, excluding Babylon (its content is the spine above)
+  const guruTeachings = getTeachingsForCure(cureNumber).filter(
+    (t) => t.bookId !== 'richest-man-babylon',
+  )
+
   return (
     <div className="space-y-8 max-w-2xl mx-auto">
       <Link href="/wealth-tree/learn" className="text-sm text-gray-500 hover:text-gray-700">
@@ -223,6 +229,47 @@ export default async function CureDetailPage({ params }: { params: Promise<{ cur
           ))}
         </div>
       </section>
+
+      {/* What the gurus say */}
+      {guruTeachings.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">What the Gurus Say</h2>
+          <div className="space-y-4">
+            {guruTeachings.map((teaching) => {
+              const book = getBook(teaching.bookId)
+              return (
+                <div
+                  key={teaching.id}
+                  className="bg-amber-50 border border-amber-200 rounded-xl p-5"
+                >
+                  <blockquote className="text-amber-800 italic">
+                    {teaching.attribution === 'quote'
+                      ? `“${teaching.text}”`
+                      : teaching.text}
+                  </blockquote>
+                  <p className="text-amber-600 text-sm mt-2">
+                    &mdash; {book?.guru ?? teaching.bookId}
+                    {book && (
+                      <>
+                        ,{' '}
+                        <Link
+                          href={`/wealth-tree/learn/library/${book.id}`}
+                          className="italic underline-offset-2 hover:underline"
+                        >
+                          {book.title}
+                        </Link>
+                      </>
+                    )}
+                  </p>
+                  <p className="text-sm text-amber-900 mt-2">
+                    <span className="font-semibold">Apply it:</span> {teaching.application}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Navigation */}
       <div className="flex justify-between pt-4 border-t border-gray-200">

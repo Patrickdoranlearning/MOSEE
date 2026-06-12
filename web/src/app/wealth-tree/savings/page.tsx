@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { SavingsRateGauge } from '@/components/wealth-tree/SavingsRateGauge'
+import { TeachingCard } from '@/components/wealth-tree/TeachingCard'
 import type { SavingsEntry } from '@/types/wealth-tree'
 import { formatWealthCurrency } from '@/types/wealth-tree'
 
@@ -132,6 +133,8 @@ export default function SavingsPage() {
           For every ten coins thou placest within thy purse, take out for use but nine.
         </p>
       </div>
+
+      <TeachingCard topics={['saving']} />
 
       {/* Gauge + summary */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

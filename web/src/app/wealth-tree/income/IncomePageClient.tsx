@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { TeachingCard } from '@/components/wealth-tree/TeachingCard'
 import type { IncomeEntry, IncomeSource, RecurrenceFrequency } from '@/types/wealth-tree'
 import { formatWealthCurrency } from '@/types/wealth-tree'
 
@@ -124,6 +125,8 @@ export default function IncomePageClient() {
           Track every stream of gold that flows to your purse.
         </p>
       </div>
+
+      <TeachingCard topics={['income', 'skills']} />
 
       {/* Monthly total card */}
       <div className="bg-white border border-gray-200 rounded-lg p-5 border-l-4 border-l-green-500">

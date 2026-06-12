@@ -190,7 +190,7 @@ export interface WealthDashboard {
   net_worth: number
   emergency_fund_progress: number  // 0-1
   goals_by_tier: Record<TreeTier, { total: number; completed: number }>
-  cure_scores: Record<CureNumber, number>  // 0-100 health score per cure
+  cure_scores: Record<CureNumber, number | null>  // 0-100 health score per cure; null = not tracked
 }
 
 // ─── Tree configuration ─────────────────────────────────────

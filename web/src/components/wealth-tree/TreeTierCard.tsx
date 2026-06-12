@@ -29,15 +29,18 @@ export function TreeTierCard({
     completed: 0,
   }
 
-  // Average score of cures in this tier
-  const cureScores = config.cures.map(
-    (n) => dashboard.cure_scores[n as CureNumber] ?? 0
-  )
+  // Average score of cures in this tier. Null = "not tracked": exclude it
+  // from the average rather than counting it as 0, which would unfairly drag
+  // a tier's health down for a cure the user simply hasn't started tracking.
+  const trackedScores = config.cures
+    .map((n) => dashboard.cure_scores[n as CureNumber])
+    .filter((s): s is number => s !== null)
   const avgScore =
-    cureScores.length > 0
-      ? cureScores.reduce((a, b) => a + b, 0) / cureScores.length
+    trackedScores.length > 0
+      ? trackedScores.reduce((a, b) => a + b, 0) / trackedScores.length
       : 0
   const roundedAvg = Math.round(avgScore)
+  const allUntracked = trackedScores.length === 0
 
   const getHealthLabel = (score: number): string => {
     if (score >= 80) return 'Thriving'
@@ -83,20 +86,26 @@ export function TreeTierCard({
         <div className="flex items-center gap-4">
           {/* Health indicator */}
           <div className="hidden sm:flex flex-col items-end gap-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">
-                {getHealthLabel(roundedAvg)}
-              </span>
-              <span className={`text-sm font-bold ${colors.text}`}>
-                {roundedAvg}
-              </span>
-            </div>
-            <div className="w-24 h-1.5 rounded-full bg-white/60 overflow-hidden">
-              <div
-                className={`h-full rounded-full ${getHealthBarColor(roundedAvg)} transition-all duration-500`}
-                style={{ width: `${roundedAvg}%` }}
-              />
-            </div>
+            {allUntracked ? (
+              <span className="text-xs text-gray-400">Not tracked</span>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">
+                    {getHealthLabel(roundedAvg)}
+                  </span>
+                  <span className={`text-sm font-bold ${colors.text}`}>
+                    {roundedAvg}
+                  </span>
+                </div>
+                <div className="w-24 h-1.5 rounded-full bg-white/60 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${getHealthBarColor(roundedAvg)} transition-all duration-500`}
+                    style={{ width: `${roundedAvg}%` }}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           {/* Goals count */}
@@ -130,13 +139,19 @@ export function TreeTierCard({
         <div className="px-4 pb-4 pt-0">
           {/* Mobile health bar */}
           <div className="sm:hidden mb-3 flex items-center gap-2">
-            <div className="flex-1 h-1.5 rounded-full bg-white/60 overflow-hidden">
-              <div
-                className={`h-full rounded-full ${getHealthBarColor(roundedAvg)} transition-all duration-500`}
-                style={{ width: `${roundedAvg}%` }}
-              />
-            </div>
-            <span className="text-xs text-gray-500">{roundedAvg}/100</span>
+            {allUntracked ? (
+              <span className="text-xs text-gray-400">Not tracked</span>
+            ) : (
+              <>
+                <div className="flex-1 h-1.5 rounded-full bg-white/60 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${getHealthBarColor(roundedAvg)} transition-all duration-500`}
+                    style={{ width: `${roundedAvg}%` }}
+                  />
+                </div>
+                <span className="text-xs text-gray-500">{roundedAvg}/100</span>
+              </>
+            )}
           </div>
 
           {/* Cure cards grid */}
@@ -146,7 +161,7 @@ export function TreeTierCard({
                 key={cure.number}
                 cure={cure}
                 score={
-                  dashboard.cure_scores[cure.number as CureNumber] ?? 0
+                  dashboard.cure_scores[cure.number as CureNumber] ?? null
                 }
               />
             ))}

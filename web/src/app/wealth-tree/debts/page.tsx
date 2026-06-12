@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { TeachingCard } from '@/components/wealth-tree/TeachingCard'
 import type { DebtEntry, DebtType } from '@/types/wealth-tree'
 import { formatWealthCurrency } from '@/types/wealth-tree'
 
@@ -111,6 +112,8 @@ export default function DebtsPage() {
           Guard thy treasures from loss -- manage and eliminate debt systematically.
         </p>
       </div>
+
+      <TeachingCard topics={['debt', 'risk']} />
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { SEVEN_CURES, TIER_COLORS } from '@/types/wealth-tree'
+import { BOOKS } from '@/lib/wealth-education'
 
 export default function LearnPage() {
   return (
@@ -52,6 +53,41 @@ export default function LearnPage() {
           )
         })}
       </div>
+
+      {/* Library — books behind the cures */}
+      <div>
+        <div className="mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Library</h2>
+          <p className="text-gray-600 text-sm mt-1">
+            The books and gurus behind the cures — the investing wisdom MOSEE is built on.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {BOOKS.map((book) => (
+            <Link
+              key={book.id}
+              href={`/wealth-tree/learn/library/${book.id}`}
+              className="block bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-amber-200 transition-all"
+            >
+              <h3 className="font-semibold text-gray-900">{book.title}</h3>
+              <p className="text-sm text-amber-700 mt-0.5">{book.guru}</p>
+              <p className="text-sm text-gray-500 mt-2">{book.tagline}</p>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Knowledge Base bridge */}
+      <Link
+        href="/knowledge"
+        className="block bg-gray-50 border border-gray-200 rounded-xl p-5 hover:bg-gray-100 transition-colors"
+      >
+        <h3 className="font-semibold text-gray-900">Knowledge Base &rarr;</h3>
+        <p className="text-sm text-gray-500 mt-1">
+          Book principles &amp; deeper research.
+        </p>
+      </Link>
     </div>
   )
 }

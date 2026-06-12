@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
+import { TeachingCard } from '@/components/wealth-tree/TeachingCard'
 import type { ExpenseEntry, ExpenseCategory, RecurrenceFrequency } from '@/types/wealth-tree'
 import { formatWealthCurrency } from '@/types/wealth-tree'
 
@@ -155,6 +156,8 @@ export default function ExpensesPageClient() {
           Control thy expenditures -- budget wisely between needs and desires.
         </p>
       </div>
+
+      <TeachingCard topics={['budgeting', 'saving']} />
 
       {/* Monthly total + Pie chart */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

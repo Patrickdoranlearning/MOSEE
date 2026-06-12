@@ -68,7 +68,12 @@ export function WealthTreeVisualization({
 }
 
 function OverallHealthBar({ dashboard }: { dashboard: WealthDashboard }) {
-  const cureValues = Object.values(dashboard.cure_scores)
+  // Exclude null ("not tracked") cures from the overall average — counting
+  // them as 0 would understate health for cures the user hasn't started
+  // tracking. Average over tracked cures only.
+  const cureValues = Object.values(dashboard.cure_scores).filter(
+    (s): s is number => s !== null
+  )
   const overallScore =
     cureValues.length > 0
       ? Math.round(cureValues.reduce((a, b) => a + b, 0) / cureValues.length)

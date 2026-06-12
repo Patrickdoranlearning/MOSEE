@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { getSkills, createSkill } from '@/lib/wealth-tree-db'
+import { getSkills, createSkill, deleteSkill } from '@/lib/wealth-tree-db'
 
 export async function GET() {
   try {
@@ -42,6 +42,35 @@ export async function POST(request: NextRequest) {
     console.error('POST /api/wealth-tree/skills error:', e)
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Failed to create skill' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 })
+    }
+
+    const deleted = await deleteSkill(session.user.id, id)
+    if (!deleted) {
+      return NextResponse.json({ error: 'Skill not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    console.error('DELETE /api/wealth-tree/skills error:', e)
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Failed to delete skill' },
       { status: 500 }
     )
   }

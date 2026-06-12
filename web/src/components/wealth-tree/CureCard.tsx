@@ -5,7 +5,7 @@ import type { CureConfig } from '@/types/wealth-tree'
 
 interface CureCardProps {
   cure: CureConfig
-  score: number // 0-100
+  score: number | null // 0-100, or null when not tracked
 }
 
 function getScoreColor(score: number): {
@@ -27,8 +27,12 @@ function getScoreLabel(score: number): string {
 }
 
 export function CureCard({ cure, score }: CureCardProps) {
-  const colors = getScoreColor(score)
-  const clampedScore = Math.max(0, Math.min(100, score))
+  // Honest "not tracked" branch: a null score means we have no data to
+  // measure this cure — render a neutral gray pill, never a red "Critical".
+  const notTracked = score === null
+
+  const clampedScore = notTracked ? 0 : Math.max(0, Math.min(100, score))
+  const colors = getScoreColor(clampedScore)
 
   return (
     <Link href={`/wealth-tree/learn/${cure.number}`}>
@@ -43,9 +47,15 @@ export function CureCard({ cure, score }: CureCardProps) {
               {cure.title}
             </h4>
           </div>
-          <div className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}>
-            {clampedScore}
-          </div>
+          {notTracked ? (
+            <div className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+              Not tracked
+            </div>
+          ) : (
+            <div className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}>
+              {clampedScore}
+            </div>
+          )}
         </div>
 
         {/* Principle text */}
@@ -53,18 +63,27 @@ export function CureCard({ cure, score }: CureCardProps) {
           {cure.principle}
         </p>
 
-        {/* Mini progress bar */}
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-            <div
-              className={`h-full rounded-full ${colors.bar} transition-all duration-500`}
-              style={{ width: `${clampedScore}%` }}
-            />
+        {notTracked ? (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden" />
+            <span className="text-xs text-gray-400 flex-shrink-0">
+              Add data to track this cure
+            </span>
           </div>
-          <span className="text-xs text-gray-400 flex-shrink-0">
-            {getScoreLabel(clampedScore)}
-          </span>
-        </div>
+        ) : (
+          /* Mini progress bar */
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+              <div
+                className={`h-full rounded-full ${colors.bar} transition-all duration-500`}
+                style={{ width: `${clampedScore}%` }}
+              />
+            </div>
+            <span className="text-xs text-gray-400 flex-shrink-0">
+              {getScoreLabel(clampedScore)}
+            </span>
+          </div>
+        )}
       </div>
     </Link>
   )

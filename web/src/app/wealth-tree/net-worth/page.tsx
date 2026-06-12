@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+import { TeachingCard } from '@/components/wealth-tree/TeachingCard'
 import { formatWealthCurrency } from '@/types/wealth-tree'
 import type { NetWorthSnapshot } from '@/types/wealth-tree'
 
@@ -31,6 +32,13 @@ function CustomTooltip({ active, payload, label }: {
   )
 }
 
+interface DerivedSnapshot {
+  total_assets: number
+  total_liabilities: number
+  net_worth: number
+  breakdown: { savings: number; investments: number; debt: number }
+}
+
 export default function NetWorthPage() {
   const [snapshots, setSnapshots] = useState<NetWorthSnapshot[]>([])
   const [loading, setLoading] = useState(true)
@@ -41,6 +49,65 @@ export default function NetWorthPage() {
     total_assets: '',
     total_liabilities: '',
   })
+
+  // Auto-snapshot (derived from current dashboard totals) state
+  const [deriving, setDeriving] = useState(false)
+  const [derived, setDerived] = useState<DerivedSnapshot | null>(null)
+  const [snapshotError, setSnapshotError] = useState<string | null>(null)
+
+  async function handleDeriveSnapshot() {
+    setDeriving(true)
+    setSnapshotError(null)
+    setShowForm(false)
+    try {
+      const res = await fetch('/api/wealth-tree/dashboard')
+      if (!res.ok) throw new Error('Failed to load current data')
+      const dashboard = await res.json()
+      // Coerce defensively — dashboard numbers may arrive as strings/null.
+      const savings = Number(dashboard.total_savings) || 0
+      const investments = Number(dashboard.total_investments) || 0
+      const debt = Number(dashboard.total_debt) || 0
+      const totalAssets = savings + investments
+      setDerived({
+        total_assets: totalAssets,
+        total_liabilities: debt,
+        net_worth: totalAssets - debt,
+        breakdown: { savings, investments, debt },
+      })
+    } catch (e) {
+      setSnapshotError(e instanceof Error ? e.message : 'Failed to compute snapshot')
+    } finally {
+      setDeriving(false)
+    }
+  }
+
+  async function handleConfirmSnapshot() {
+    if (!derived) return
+    setSubmitting(true)
+    setSnapshotError(null)
+    try {
+      const res = await fetch('/api/wealth-tree/net-worth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          snapshot_date: new Date().toISOString().split('T')[0],
+          total_assets: derived.total_assets,
+          total_liabilities: derived.total_liabilities,
+          breakdown: derived.breakdown,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to save snapshot')
+      }
+      await fetchSnapshots()
+      setDerived(null)
+    } catch (e) {
+      setSnapshotError(e instanceof Error ? e.message : 'Failed to save snapshot')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   useEffect(() => {
     fetchSnapshots()
@@ -114,11 +181,89 @@ export default function NetWorthPage() {
           <h1 className="text-2xl font-bold text-gray-900">Net Worth</h1>
           <p className="text-gray-500 text-sm mt-1">Track your wealth over time</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
-          {showForm ? 'Cancel' : '+ Add Snapshot'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleDeriveSnapshot} disabled={deriving}
+            className="px-4 py-2 bg-white border border-green-600 text-green-700 rounded-lg text-sm font-medium hover:bg-green-50 transition-colors disabled:opacity-50">
+            {deriving ? 'Computing...' : 'Snapshot from current data'}
+          </button>
+          <button onClick={() => { setShowForm(!showForm); setDerived(null) }}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
+            {showForm ? 'Cancel' : '+ Add manually'}
+          </button>
+        </div>
       </div>
+
+      <TeachingCard topics={['net-worth', 'compounding']} />
+
+      {/* Snapshot error */}
+      {snapshotError && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-700">{snapshotError}</p>
+        </div>
+      )}
+
+      {/* Auto-snapshot confirm step */}
+      {derived && (
+        <div className="bg-white rounded-xl border-2 border-green-200 p-6 space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Confirm snapshot</h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Derived from your current savings, investments, and debt totals as of today.
+              Review before saving.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Savings</p>
+              <p className="text-lg font-bold text-gray-900">
+                {formatWealthCurrency(derived.breakdown.savings)}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Investments</p>
+              <p className="text-lg font-bold text-gray-900">
+                {formatWealthCurrency(derived.breakdown.investments)}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Debt</p>
+              <p className="text-lg font-bold text-gray-900">
+                {formatWealthCurrency(derived.breakdown.debt)}
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-gray-100">
+            <div>
+              <p className="text-xs text-gray-500">Total Assets</p>
+              <p className="text-xl font-bold text-green-600">
+                {formatWealthCurrency(derived.total_assets)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Total Liabilities</p>
+              <p className="text-xl font-bold text-red-600">
+                {formatWealthCurrency(derived.total_liabilities)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Net Worth</p>
+              <p className="text-xl font-bold text-gray-900">
+                {formatWealthCurrency(derived.net_worth)}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={handleConfirmSnapshot} disabled={submitting}
+              className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50">
+              {submitting ? 'Saving...' : 'Save this snapshot'}
+            </button>
+            <button onClick={() => setDerived(null)} disabled={submitting}
+              className="px-5 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">

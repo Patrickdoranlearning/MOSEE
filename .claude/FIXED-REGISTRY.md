@@ -29,3 +29,35 @@ Visual snapshots (from `jimmy snapshot`) use the same format plus a **Screenshot
 - **What the fix looks like**: `/lib/` and `/lib64/` root-anchored with a comment explaining why. NEVER revert to bare `lib/`. New files under `web/src/lib/` must show up in `git status`
 - **Date**: 2026-06-11
 - **Protected until**: permanent
+
+### Honest cure scores 5/6/7 — null means "Not tracked", never a silent 0
+- **File**: `web/src/lib/wealth-tree-db.ts` (cure score block in `getWealthDashboard`), `web/src/components/wealth-tree/CureCard.tsx`, `web/src/components/wealth-tree/TreeTierCard.tsx`, `web/src/components/wealth-tree/WealthTreeVisualization.tsx`, `web/src/app/wealth-tree/page.tsx`
+- **Lines**: ~620-700 (db), null branches in each consumer
+- **What was fixed**: Cures 5/6/7 were hardcoded `0`, rendering a false red "Critical" for users with no real-estate/retirement/skills data
+- **What the fix looks like**: `cure_scores: Record<CureNumber, number | null>`; missing data → `null` → gray "Not tracked" pill. Averages EXCLUDE nulls (never coerce `null` to 0 with `|| 0`). Cure formulas clamp to [0, 100] and guard every denominator
+- **Date**: 2026-06-12
+- **Protected until**: permanent
+
+### TeachingCard UTC day-of-year (hydration safety)
+- **File**: `web/src/components/wealth-tree/TeachingCard.tsx`
+- **Lines**: ~17-22
+- **What was fixed**: Local-timezone day-of-year made server (UTC) and client disagree near midnight → React hydration mismatch
+- **What the fix looks like**: `dayOfYear()` computed entirely from `Date.UTC`/`getUTC*` parts; initial teaching index stays deterministic (`dayOfYear() % pool.length`). NEVER use `Math.random()` or local-time date math for the initial render
+- **Date**: 2026-06-12
+- **Protected until**: permanent
+
+### Cure 5 home-equity score clamped to [0, 100]
+- **File**: `web/src/lib/wealth-tree-db.ts`
+- **Lines**: ~633-638
+- **What was fixed**: Equity branch only floored at 0; bad data (negative mortgage balance) could push the score above 100
+- **What the fix looks like**: `Math.max(0, Math.min(100, Math.round(((reValue - mortgageBalance) / reValue) * 100)))` — both branches of cure 5 carry both clamps
+- **Date**: 2026-06-12
+- **Protected until**: permanent
+
+### Calculator "Total Repaid" derived from the computed schedule
+- **File**: `web/src/app/wealth-tree/calculator/page.tsx`
+- **Lines**: ~350
+- **What was fixed**: Total Repaid read the live balance input, so editing inputs after calculating silently desynced it from the displayed schedule
+- **What the fix looks like**: `schedule.reduce((sum, row) => sum + (Number(row.payment) || 0), 0)` — always derived from the schedule rows, never from input state
+- **Date**: 2026-06-12
+- **Protected until**: permanent

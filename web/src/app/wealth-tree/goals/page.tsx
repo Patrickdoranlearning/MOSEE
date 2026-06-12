@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { SEVEN_CURES, TIER_COLORS } from '@/types/wealth-tree'
+import { TeachingCard } from '@/components/wealth-tree/TeachingCard'
 import type { WealthGoal, CureNumber } from '@/types/wealth-tree'
 import { formatWealthCurrency } from '@/types/wealth-tree'
 
@@ -134,6 +135,8 @@ export default function GoalsPage() {
           {showForm ? 'Cancel' : '+ New Goal'}
         </button>
       </div>
+
+      <TeachingCard topics={['goals']} />
 
       {/* Progress Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

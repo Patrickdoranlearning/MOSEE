@@ -41,9 +41,26 @@ function StatCard({
   )
 }
 
-function CureHealthBar({ cure, score }: { cure: number; score: number }) {
+function CureHealthBar({ cure, score }: { cure: number; score: number | null }) {
   const config = SEVEN_CURES.find((c) => c.number === cure)
   if (!config) return null
+
+  // Honest "not tracked" branch: null score → neutral gray, no bar fill,
+  // never a fabricated 0%/red.
+  if (score === null) {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-mono text-gray-400 w-4 text-right">{cure}</span>
+        <div className="flex-1">
+          <div className="flex items-center justify-between mb-0.5">
+            <p className="text-xs font-medium text-gray-700 truncate pr-2">{config.title}</p>
+            <span className="text-xs text-gray-400 tabular-nums">Not tracked</span>
+          </div>
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden" />
+        </div>
+      </div>
+    )
+  }
 
   const barColor =
     score >= 75 ? 'bg-green-500' : score >= 40 ? 'bg-yellow-500' : 'bg-red-400'
@@ -199,7 +216,7 @@ export default async function WealthTreeDashboard() {
               <CureHealthBar
                 key={cure}
                 cure={cure}
-                score={dashboard.cure_scores[cure] || 0}
+                score={dashboard.cure_scores[cure] ?? null}
               />
             ))}
           </div>
