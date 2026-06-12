@@ -4,10 +4,18 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { StockSummary, VERDICT_COLORS, formatCurrency } from '@/types/mosee'
 
+interface MarketResult {
+  symbol: string
+  name: string
+  exchange: string
+  type: string
+}
+
 export function CommandPalette() {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [stocks, setStocks] = useState<StockSummary[]>([])
+  const [marketResults, setMarketResults] = useState<MarketResult[]>([])
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [loaded, setLoaded] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -64,6 +72,45 @@ export function CommandPalette() {
     setSelectedIndex(0)
   }, [results])
 
+  // When the local (analyzed-stocks) filter yields few/no hits, resolve the
+  // query against Yahoo's search so company names map to tickers (e.g.
+  // "everplay" -> EVPL.L). Debounced to avoid hammering the endpoint.
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 2 || results.length >= 3) {
+      setMarketResults([])
+      return
+    }
+
+    let cancelled = false
+    const timer = setTimeout(() => {
+      fetch(`/api/ticker-search?q=${encodeURIComponent(q)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (cancelled) return
+          setMarketResults(Array.isArray(data?.results) ? data.results : [])
+        })
+        .catch(() => {
+          if (!cancelled) setMarketResults([])
+        })
+    }, 300)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [query, results.length])
+
+  // Drop market candidates whose symbol already appears in local results.
+  const localTickers = useMemo(
+    () => new Set(results.map(s => s.ticker.toUpperCase())),
+    [results]
+  )
+  const marketCandidates = useMemo(
+    () => marketResults.filter(m => !localTickers.has(m.symbol.toUpperCase())),
+    [marketResults, localTickers]
+  )
+
   const close = useCallback(() => {
     setIsOpen(false)
     setQuery('')
@@ -75,7 +122,7 @@ export function CommandPalette() {
   }, [router, close])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    const totalItems = results.length + (query.trim() ? 1 : 0)
+    const totalItems = results.length + marketCandidates.length + (query.trim() ? 1 : 0)
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setSelectedIndex(i => (i + 1) % totalItems)
@@ -86,6 +133,8 @@ export function CommandPalette() {
       e.preventDefault()
       if (selectedIndex < results.length) {
         navigate(results[selectedIndex].ticker)
+      } else if (selectedIndex < results.length + marketCandidates.length) {
+        navigate(marketCandidates[selectedIndex - results.length].symbol)
       } else if (query.trim()) {
         navigate(query.trim().toUpperCase())
       }
@@ -127,7 +176,7 @@ export function CommandPalette() {
 
         {/* Results */}
         <div className="max-h-80 overflow-y-auto">
-          {results.length === 0 && query.trim() && (
+          {results.length === 0 && marketCandidates.length === 0 && query.trim() && (
             <div className="px-4 py-6 text-center text-sm text-gray-500">
               No analyzed stocks match &ldquo;{query}&rdquo;
             </div>
@@ -162,14 +211,42 @@ export function CommandPalette() {
             </button>
           ))}
 
+          {/* Market search — resolve company names to tickers via Yahoo */}
+          {marketCandidates.length > 0 && (
+            <div className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400 border-t border-gray-100">
+              Market search
+            </div>
+          )}
+          {marketCandidates.map((m, i) => {
+            const idx = results.length + i
+            return (
+              <button
+                key={m.symbol}
+                className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
+                  idx === selectedIndex ? 'bg-blue-50' : 'hover:bg-gray-50'
+                }`}
+                onClick={() => navigate(m.symbol)}
+                onMouseEnter={() => setSelectedIndex(idx)}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="font-bold text-gray-900 shrink-0">{m.symbol}</span>
+                  <span className="text-sm text-gray-500 truncate">{m.name}</span>
+                </div>
+                {m.exchange && (
+                  <span className="text-xs text-gray-400 shrink-0 ml-3">{m.exchange}</span>
+                )}
+              </button>
+            )
+          })}
+
           {/* Search on market option */}
           {query.trim() && (
             <button
               className={`w-full flex items-center gap-3 px-4 py-3 text-left border-t border-gray-100 transition-colors ${
-                selectedIndex === results.length ? 'bg-blue-50' : 'hover:bg-gray-50'
+                selectedIndex === results.length + marketCandidates.length ? 'bg-blue-50' : 'hover:bg-gray-50'
               }`}
               onClick={() => navigate(query.trim().toUpperCase())}
-              onMouseEnter={() => setSelectedIndex(results.length)}
+              onMouseEnter={() => setSelectedIndex(results.length + marketCandidates.length)}
             >
               <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
