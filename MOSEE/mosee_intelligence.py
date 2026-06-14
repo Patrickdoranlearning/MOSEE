@@ -16,6 +16,7 @@ Key Principle (Buffett): "Price is what you pay, value is what you get"
 - Quality affects what value IS, but doesn't remove need for MoS
 """
 
+import math
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, List
 from enum import Enum
@@ -249,7 +250,11 @@ def _create_buffett_lens(metrics: Dict[str, Any], quality_score: float) -> Inves
     roic = metrics.get('roic', 0)
     debt_to_equity = metrics.get('debt_to_equity', 1)
     owner_earnings_yield = metrics.get('owner_earnings_yield', 0)
-    interest_coverage = metrics.get('interest_coverage', 0)
+    # None = interest coverage unknown (no reported interest expense). Treat as
+    # 0 points — never award max coverage points for missing data.
+    interest_coverage = metrics.get('interest_coverage')
+    if interest_coverage is None:
+        interest_coverage = 0
 
     # Buffett cares about quality first
     buffett_score = quality_score
@@ -441,7 +446,8 @@ def _determine_verdict(
     mos_ratio: float,
     confidence: str,
     mosee_score: float = None,
-    years_to_payback: float = None
+    years_to_payback: float = None,
+    earnings_equity: float = None
 ) -> tuple:
     """
     Determine final investment verdict with rationale.
@@ -502,6 +508,18 @@ def _determine_verdict(
     # Gate 2: Earnings Power
     has_poor_earnings_power = False
     earnings_details = []
+
+    # Loss-makers and data-poor stocks must NOT slip through. When earnings power
+    # can't be established (negative average earnings, or no earnings data at all),
+    # mosee_score/years_to_payback are None and the threshold checks below are
+    # skipped — without these explicit branches the gate would pass with
+    # "Acceptable earnings power" and hand a loss-maker a BUY/ACCUMULATE verdict.
+    if earnings_equity is not None and earnings_equity <= 0:
+        has_poor_earnings_power = True
+        earnings_details.append("Negative average earnings")
+    elif earnings_equity is None:
+        has_poor_earnings_power = True
+        earnings_details.append("Earnings power unknown")
 
     if mosee_score is not None and mosee_score < 0.05:
         has_poor_earnings_power = True
@@ -693,7 +711,7 @@ def generate_mosee_intelligence(
         'eps': metrics.get('eps', 0),
         'book_value_per_share': metrics.get('book_value_per_share', 0),
         'roe': metrics.get('roe', 0.10),
-        'earnings_growth': metrics.get('earnings_growth', 0.05),
+        'earnings_growth': metrics.get('earnings_growth', 0),
         'free_cash_flow': metrics.get('free_cash_flow', 0),
         'owner_earnings_per_share': metrics.get('owner_earnings_per_share', 0),
         'shares_outstanding': metrics.get('shares_outstanding', 1),
@@ -741,7 +759,8 @@ def generate_mosee_intelligence(
         mos_ratio,
         valuation.composite_confidence.value,
         mosee_score=mosee_score,
-        years_to_payback=years_to_payback
+        years_to_payback=years_to_payback,
+        earnings_equity=earnings_equity
     )
     
     # Generate recommendation text
@@ -778,7 +797,8 @@ def generate_mosee_intelligence(
         strengths.append(f"Trading with margin of safety ({mos_ratio:.0%} of conservative value)")
     if metrics.get('peg_ratio') and metrics['peg_ratio'] < 1:
         strengths.append(f"Attractive PEG ratio of {metrics['peg_ratio']:.2f}")
-    if metrics.get('interest_coverage', 0) >= 5:
+    _ic = metrics.get('interest_coverage')
+    if _ic is not None and _ic >= 5:
         strengths.append("Strong interest coverage - low debt risk")
     
     if not has_mos:
@@ -844,3 +864,105 @@ def generate_mosee_intelligence(
         verdict_rationale=verdict_rationale,
         quality_breakdown=composite.to_dict()
     )
+
+
+# Guardrail constants for the implied-return screen.
+_IMPLIED_RETURN_HORIZON_YEARS = 5
+_DIVIDEND_YIELD_CAP = 0.10        # clamp dividend yield to [0, 10%]
+_IMPLIED_RETURN_CEILING = 0.40    # > 40%/yr is a data artifact, not a real return
+
+
+def _finite_positive(value) -> bool:
+    """True only for a finite, strictly-positive number (rejects None/NaN/Inf/<=0)."""
+    if value is None:
+        return False
+    try:
+        if math.isnan(value) or not math.isfinite(value):
+            return False
+    except (TypeError, ValueError):
+        return False
+    return value > 0
+
+
+def compute_implied_annual_return(
+    report: "MOSEEIntelligenceReport",
+    metrics: Dict[str, Any],
+) -> Optional[float]:
+    """
+    Implied annualised return from buying at the current price and converging to
+    the composite BASE fair value over a 5-year horizon, plus a clamped dividend yield.
+
+        implied_annual_return = (composite_base / current_price) ** (1/5) - 1
+                                + dividend_yield_clamped
+
+    composite_base already embeds growth internally (it is built from the growth-
+    aware lenses), so dividends are the only legitimate additive term, and the
+    price-convergence component is geometric (not arithmetic).
+
+    Returns a decimal fraction (e.g. 0.15 = 15%/yr), or None when the inputs are
+    too unreliable to screen on. None is returned (never 0, never a fallback) when
+    ANY of the following hold:
+      - current_price is None/NaN/<= 0
+      - composite_base <= 0 or composite_conservative <= 0
+      - the composite range is inverted (conservative > base or optimistic < base)
+      - valuation confidence is SPECULATIVE
+      - fewer than 2 individual valuation methods backed the composite
+      - the verdict is INSUFFICIENT DATA
+      - earnings_classification == 'Distressed'
+      - the computed return exceeds the 40%/yr data-artifact ceiling
+    """
+    if report is None:
+        return None
+
+    valuation = report.valuation
+    current_price = report.current_price
+
+    # Price must be a usable positive number.
+    if not _finite_positive(current_price):
+        return None
+
+    composite_base = valuation.composite_base
+    composite_conservative = valuation.composite_conservative
+    composite_optimistic = valuation.composite_optimistic
+
+    # Both legs that anchor the screen must be positive.
+    if not _finite_positive(composite_base) or not _finite_positive(composite_conservative):
+        return None
+
+    # Reject inverted ranges (a corrupt valuation, not a real opportunity).
+    if composite_conservative > composite_base or composite_optimistic < composite_base:
+        return None
+
+    # Confidence / coverage gates.
+    if valuation.composite_confidence == ValueConfidence.SPECULATIVE:
+        return None
+    if len(valuation.individual_ranges) < 2:
+        return None
+
+    # Verdict / classification gates.
+    if report.verdict == InvestmentVerdict.INSUFFICIENT_DATA:
+        return None
+    if metrics.get('earnings_classification') == 'Distressed':
+        return None
+
+    # Dividend yield: clamp to [0, 10%]; NaN/None -> 0.
+    dividend_yield = metrics.get('dividend_yield')
+    if dividend_yield is None:
+        dividend_yield_clamped = 0.0
+    else:
+        try:
+            if math.isnan(dividend_yield) or not math.isfinite(dividend_yield):
+                dividend_yield_clamped = 0.0
+            else:
+                dividend_yield_clamped = max(0.0, min(float(dividend_yield), _DIVIDEND_YIELD_CAP))
+        except (TypeError, ValueError):
+            dividend_yield_clamped = 0.0
+
+    price_convergence = (composite_base / current_price) ** (1 / _IMPLIED_RETURN_HORIZON_YEARS) - 1
+    implied_annual_return = price_convergence + dividend_yield_clamped
+
+    # Data-artifact ceiling: anything above 40%/yr is almost certainly bad data.
+    if implied_annual_return > _IMPLIED_RETURN_CEILING:
+        return None
+
+    return implied_annual_return

@@ -331,23 +331,26 @@ def calculate_roic(nopat: float, invested_capital: float) -> float:
     return nopat / invested_capital
 
 
-def calculate_interest_coverage(ebit: float, interest_expense: float) -> float:
+def calculate_interest_coverage(ebit: float, interest_expense: Optional[float]) -> Optional[float]:
     """
     Calculate Interest Coverage Ratio.
-    
+
     Interest Coverage = EBIT / Interest Expense
-    
+
     Measures ability to pay debt obligations. Buffett looks for >= 5x coverage.
-    
+
     Args:
         ebit: Earnings Before Interest and Taxes
-        interest_expense: Annual interest expense
-        
+        interest_expense: Annual interest expense (None if unknown/not reported)
+
     Returns:
-        Interest coverage ratio
+        Interest coverage ratio, or None when interest expense is unknown or
+        non-positive. A missing/zero interest expense is "unknown", not proven
+        zero-debt — returning float('inf') would falsely award max coverage
+        points to data-poor companies.
     """
-    if interest_expense <= 0:
-        return float('inf')  # No debt = infinite coverage
+    if interest_expense is None or interest_expense <= 0:
+        return None
     return ebit / interest_expense
 
 

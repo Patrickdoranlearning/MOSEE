@@ -38,6 +38,29 @@ export interface TickerEntry {
   confidence_score: number | null
 }
 
+// Row shape consumed by the Screener page (latest-per-ticker, screening fields)
+export interface ScreenerRow {
+  ticker: string
+  company_name: string | null
+  industry: string | null
+  country: string | null
+  cap_size: string | null
+  analysis_date: string
+  current_price: number | null
+  market_cap: number | null
+  verdict: Verdict
+  quality_grade: QualityGrade | null
+  quality_score: number | null
+  margin_of_safety: number | null
+  valuation_conservative: number | null
+  valuation_base: number | null
+  valuation_optimistic: number | null
+  valuation_confidence: string | null
+  confidence_score: number | null
+  confidence_level: string | null
+  implied_annual_return: number | null
+}
+
 // Lightweight stock summary for search and dashboard (no heavy JSON fields)
 export interface StockSummary {
   id: string
@@ -62,6 +85,7 @@ export interface StockSummary {
   book_mosee: number | null
   confidence_level: string | null
   confidence_score: number | null
+  implied_annual_return: number | null
   strengths: string[]
 }
 
@@ -108,6 +132,7 @@ export interface StockAnalysis {
   book_mosee: number | null
   confidence_level: string | null
   confidence_score: number | null
+  implied_annual_return: number | null
   created_at: string
   updated_at: string
 }

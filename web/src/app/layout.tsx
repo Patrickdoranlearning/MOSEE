@@ -55,6 +55,12 @@ export default function RootLayout({
                     Weekly Picks
                   </Link>
                   <Link
+                    href="/screener"
+                    className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    Screener
+                  </Link>
+                  <Link
                     href="/wealth-tree"
                     className="text-green-600 hover:text-green-700 px-3 py-2 rounded-md text-sm font-medium"
                   >

@@ -60,6 +60,8 @@ jobs:
       - name: Run MOSEE Analysis
         env:
           POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+          # Deep non-US fundamentals (FMP Starter). Empty/unset = FMP skipped.
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
           MOSEE_DEBUG: ${{ github.event.inputs.debug_mode == 'true' && '1' || '0' }}
           # Scheduled runs go full-market; dispatch can override via input.
           MOSEE_FULL: ${{ (github.event_name == 'schedule' || github.event.inputs.full_market == 'true') && '1' || '0' }}

@@ -131,16 +131,12 @@ class CompositeValuationRange:
         - Optimistic: Use average of optimistic values (not highest - avoid anchoring)
         - Adjust width based on quality/predictability
         """
-        valid_ranges = [r for r in self.individual_ranges 
+        valid_ranges = [r for r in self.individual_ranges
                        if r.conservative > 0 and r.base > 0]
-        
+
         if not valid_ranges:
             return
-        
-        # Conservative: Take the lowest (most pessimistic) conservative value
-        # This is key - we want true margin of safety
-        self.composite_conservative = min(r.conservative for r in valid_ranges)
-        
+
         # Base: Weighted average (higher confidence methods get more weight)
         confidence_weights = {
             ValueConfidence.HIGH: 1.5,
@@ -148,19 +144,40 @@ class CompositeValuationRange:
             ValueConfidence.LOW: 0.5,
             ValueConfidence.SPECULATIVE: 0.25
         }
-        
+
         total_weight = sum(confidence_weights[r.confidence] for r in valid_ranges)
-        self.composite_base = sum(
-            r.base * confidence_weights[r.confidence] for r in valid_ranges
-        ) / total_weight if total_weight > 0 else 0
-        
-        # Optimistic: Average (not max - avoid over-optimism)
-        self.composite_optimistic = np.mean([r.optimistic for r in valid_ranges])
-        
+
+        # All three legs use the SAME confidence weighting. Mixing a weighted
+        # base with an unweighted (np.mean) optimistic/conservative can invert
+        # the range — a high-confidence narrow method paired with a low-confidence
+        # wide one pulls the base up but leaves optimistic averaged down, yielding
+        # optimistic < base. Weighting all legs identically keeps them ordered.
+        if total_weight > 0:
+            self.composite_conservative = sum(
+                r.conservative * confidence_weights[r.confidence] for r in valid_ranges
+            ) / total_weight
+            self.composite_base = sum(
+                r.base * confidence_weights[r.confidence] for r in valid_ranges
+            ) / total_weight
+            self.composite_optimistic = sum(
+                r.optimistic * confidence_weights[r.confidence] for r in valid_ranges
+            ) / total_weight
+        else:
+            self.composite_conservative = 0
+            self.composite_base = 0
+            self.composite_optimistic = 0
+
         # Adjust range based on quality score
         # Higher quality = narrower range (more predictable)
         self._adjust_for_quality()
-        
+
+        # Final safety net: enforce conservative <= base <= optimistic.
+        # _adjust_for_quality can independently floor conservative and cap
+        # optimistic, so sort the three values to guarantee a valid ordering.
+        self.composite_conservative, self.composite_base, self.composite_optimistic = sorted(
+            [self.composite_conservative, self.composite_base, self.composite_optimistic]
+        )
+
         # Determine overall confidence
         self._calculate_confidence()
     

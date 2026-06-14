@@ -6,6 +6,13 @@ Sequential record of shipped work. Wrap-up Pillar 4 appends an entry whenever co
 
 ---
 
+## 2026-06-12 — Wealth education layer
+
+- `0267b6f` feat(web): wealth education layer — book/guru teachings registry (8 books, 48 teachings, attribution honesty flags), TeachingCard on all 8 wealth tools, Learn Library + guru sections on cure pages, Skills page (Cure 7) + DELETE endpoint, debt-payoff calculator tab, net-worth auto-snapshot, honest cure scores 5/6/7 (`number | null`, "Not tracked" UI)
+- Plan: `plans/completed/PLAN-wealth-education.md` (Karen-approved, fully executed)
+- Gates: tsc/eslint/next-build green; tester 10/11 live pass; reviewer approved (3 P2 fixes applied); validator VALIDATED; 4 FIXED-REGISTRY entries added
+- Zero schema changes; cures 1–4 regression-verified byte-identical; not pushed
+
 ## 2026-06-11 — Jimmy agent system + deep-dive runs
 
 - `d5f7d4a` fix: root-anchor `/lib/` in .gitignore — rescued silently-untracked `web/src/lib/` sources (deep-dive.ts, auth-db.ts, wealth-tree-db.ts); GitHub copy of the repo was unbuildable

@@ -32,6 +32,7 @@ function toSummary(stock: Awaited<ReturnType<typeof getAllAnalyses>>[number]): S
     book_mosee: stock.book_mosee,
     confidence_level: stock.confidence_level,
     confidence_score: stock.confidence_score,
+    implied_annual_return: stock.implied_annual_return,
     strengths: stock.strengths || [],
   }
 }
